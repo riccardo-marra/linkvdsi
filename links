@@ -1,6 +1,6 @@
 ######### 1) OSCP CheatSheets #########
 
-1.1) OSCP CheatSheet: https://github.com/0xsyr0/OSCP?tab=readme-ov-file
+1.1) OSCP CheatSheet pt1: https://github.com/0xsyr0/OSCP?tab=readme-ov-file
 
 1.2) OSCP CheatSheet pt2: https://github.com/saisathvik1/OSCP-Cheatsheet?tab=readme-ov-file
 
@@ -11,7 +11,6 @@
 
 ######### 2) Lista di robe tipo privesc/payloads etc  #########
 
-
 2.1) Lista di payloads: https://github.com/swisskyrepo/PayloadsAllTheThings
 
 2.2) Lista di privilege escalation: https://github.com/m0nad/awesome-privilege-escalation
@@ -20,7 +19,9 @@
 
 2.4) CRLF Injection: https://book.hacktricks.xyz/pentesting-web/crlf-0d-0a
 
+2.5) Unipg corso sicurezza informatica pt1 : https://bista.sites.dmi.unipg.it/didattica/sicurezza-pg/
 
+2.6) Unipg corso sicurezza informatica pt2 : https://bista.sites.dmi.unipg.it/didattica/sicurezza-pg/buffer-overrun/
 
 ######### 3) Miscellaneous #########
 
