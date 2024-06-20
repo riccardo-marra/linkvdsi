@@ -1,0 +1,6 @@
+gef➤  info variables flag
+All variables matching regular expression flag:
+
+Non-debugging symbols:
+0x0804c028  flag
+

