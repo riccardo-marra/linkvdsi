@@ -1,3 +1,9 @@
+// Upload form exploit
+// Tip: Quando trovi qualcosa, per esempio un form di upload, cerca su internet "file upload bypass" o comunque "xxxxx bypass" e non focalizzarti troppo su una cosa
+        Cerca anche di fare con php e non direttamente con sh, anche perchè non puoi farlo eseguire un file .sh semplicemente cliccando dalla pagina /uploads/
+        gli unici file eseguibili così sono .php 
+
+
 ### INFORMATION GATHERING ###
 
 ─ nmap -Pn -sV 10.10.168.16 
