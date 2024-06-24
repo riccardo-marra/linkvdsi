@@ -1,0 +1,35 @@
+### INFORMATION GATHERING ###
+╰─ nmap -Pn -A 10.10.4.131                                        
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-06-24 18:24 CEST
+Nmap scan report for 10.10.4.131
+Host is up (0.051s latency).
+Not shown: 998 closed tcp ports (conn-refused)
+PORT   STATE SERVICE VERSION
+22/tcp open  ssh     OpenSSH 8.2p1 Ubuntu 4ubuntu0.5 (Ubuntu Linux; protocol 2.0)
+| ssh-hostkey: 
+|   3072 4b:79:5f:32:d0:68:85:22:6c:e5:34:d3:16:73:a7:db (RSA)
+|   256 3b:03:3c:4d:d5:d6:c6:de:a5:8a:b3:0e:0e:11:93:2f (ECDSA)
+|_  256 af:dd:33:7d:ef:34:ae:cd:59:26:79:be:07:ab:d7:6e (ED25519)
+80/tcp open  http    Apache httpd 2.4.53 ((Debian))
+|_http-title: Login
+| http-cookie-flags: 
+|   /: 
+|     PHPSESSID: 
+|_      httponly flag not set
+|_http-server-header: Apache/2.4.53 (Debian)
+Service Info: OS: Linux; CPE: cpe:/o:linux:linux_kernel
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 11.47 seconds
+                                                                     
+andando sul sito, vedo che ho un login ma che in fondo ho la scritta: Don't have an account? Use the guest account! (Ctrl+U) => premendo CTRL+U 
+vedo che nel codice ho: 
+<!-- use guest:guest credentials until registration is fixed. "admin" user account is off limits!!!!! --> => proviamo guest:guest
+nel mentre avvio anche gobuster
+
+dopo aver fatto il login vedo che l'url è: http://10.10.4.131/profile.php?user=guest => provo a cambiare da guest ad admin => http://10.10.4.131/profile.php?user=admin ed ottengo facilmente la flag :D
+
+flag{66be95c478473d91a5358f2440c7af1f} <-- FLAG :D 
+
+(sono un pò deluso da sta macchina, sinceramente)
+
